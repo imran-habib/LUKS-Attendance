@@ -95,8 +95,14 @@ def main():
     # --- HR Interactive Resolution ---
     flagged = set()
 
+    # Determine which employees need salary prompts (skip monthly/excluded)
+    def _needs_salary(name):
+        nl = name.lower().strip()
+        db = employee_db.get(nl, {})
+        return db.get("type", "weekly") == "weekly" and nl not in EXCLUDED_FROM_SALARY
+
     # Handle last-day OUT times
-    last_day_issues = [i for i in issues if i["type"] == "last_day_out"]
+    last_day_issues = [i for i in issues if i["type"] == "last_day_out" and _needs_salary(i["name"])]
     if last_day_issues:
         print(f"\n\u23f0 Last day (day {last_day_num}) - Enter OUT times:")
         print("   (Press Enter for default 17:00, type 'skip' to exclude)")
@@ -117,7 +123,7 @@ def main():
                 print("     \u26a0\ufe0f  Invalid time format. Use HH:MM")
 
     # Handle missing OUT punches
-    missing_issues = [i for i in issues if i["type"] == "missing_out"]
+    missing_issues = [i for i in issues if i["type"] == "missing_out" and _needs_salary(i["name"])]
     if missing_issues:
         print(f"\n\u26a0\ufe0f  Missing OUT punches ({len(missing_issues)} records):")
         print("   (Enter OUT time, or 'skip' to exclude from salary)")
@@ -191,7 +197,10 @@ def main():
             continue
 
         if etype == "monthly" or name_lower in MONTHLY_WORKERS:
-            pass  # include anyway, HR decides
+            # Monthly workers: just track days present, skip salary
+            days_present = sum(1 for r in recs if r.get("in_time"))
+            excluded_summary.append((name_lower, days_present))
+            continue
 
         prev = carry_over.get(name_lower, {})
         hourly_rate = daily_rate / 8 if daily_rate else 0
