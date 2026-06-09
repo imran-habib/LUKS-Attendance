@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace LuksAttendance;
 
@@ -17,8 +19,19 @@ public class AttendanceRow
     public string Status { get; set; } = "";
 }
 
-public class SalaryRow
+public class SalaryRow : INotifyPropertyChanged
 {
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? prop = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+
+    private void Recalculate()
+    {
+        NetSalary = Math.Round(
+            (decimal)(Days * DailyRate + (NetHours + _extraHrs) * HourlyRate)
+            - _advance + _arrears, 2);
+    }
+
     public string Name { get; set; } = "";
     public int Days { get; set; }
     public double OtHours { get; set; }
@@ -26,10 +39,34 @@ public class SalaryRow
     public double NetHours { get; set; }
     public int DailyRate { get; set; }
     public double HourlyRate { get; set; }
-    public double ExtraHrs { get; set; }
-    public decimal Advance { get; set; }
-    public decimal Arrears { get; set; }
-    public decimal NetSalary { get; set; }
+
+    private double _extraHrs;
+    public double ExtraHrs
+    {
+        get => _extraHrs;
+        set { _extraHrs = value; OnPropertyChanged(); Recalculate(); }
+    }
+
+    private decimal _advance;
+    public decimal Advance
+    {
+        get => _advance;
+        set { _advance = value; OnPropertyChanged(); Recalculate(); }
+    }
+
+    private decimal _arrears;
+    public decimal Arrears
+    {
+        get => _arrears;
+        set { _arrears = value; OnPropertyChanged(); Recalculate(); }
+    }
+
+    private decimal _netSalary;
+    public decimal NetSalary
+    {
+        get => _netSalary;
+        set { _netSalary = value; OnPropertyChanged(); }
+    }
 }
 
 public static class SalaryCalc
@@ -88,7 +125,7 @@ public static class SalaryCalc
             Days = daysWorked, OtHours = otH, DedHours = dedH,
             NetHours = netH, DailyRate = dailyRate,
             HourlyRate = Math.Round(hourlyRate, 2),
-            Advance = advance, Arrears = arrears, NetSalary = netSalary
+            _extraHrs = 0, _advance = advance, _arrears = arrears, _netSalary = netSalary
         };
     }
 
@@ -97,14 +134,13 @@ public static class SalaryCalc
         var inDt = TimeSpan.ParseExact(inTime, "hh\\:mm", CultureInfo.InvariantCulture);
         var outDt = TimeSpan.ParseExact(outTime, "hh\\:mm", CultureInfo.InvariantCulture);
         var diff = outDt - inDt;
-        if (diff < TimeSpan.Zero) diff += TimeSpan.FromHours(24); // cross-midnight
+        if (diff < TimeSpan.Zero) diff += TimeSpan.FromHours(24);
         return diff;
     }
 
     private static TimeSpan CalcEffective(TimeSpan presence, string outTime)
     {
         int outHour = int.Parse(outTime[..2]);
-        // Deduct lunch if OUT >= 13:00
         if (outHour >= LunchCutoffHour)
             return presence - TimeSpan.FromMinutes(LunchBreakMinutes);
         return presence;
