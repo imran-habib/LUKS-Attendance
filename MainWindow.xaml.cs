@@ -177,6 +177,39 @@ public partial class MainWindow : Window
         PdfExporter.Print(_salaryRows);
     }
 
+    private async void BtnDeviceFetch_Click(object sender, RoutedEventArgs e)
+    {
+        var ip = TxtDeviceIp.Text.Trim();
+        int port = int.TryParse(TxtDevicePort.Text.Trim(), out int p) ? p : 5005;
+
+        BtnDeviceConnect.IsEnabled = false;
+        TxtDeviceStatus.Text = $"Connecting to {ip}:{port}...";
+
+        try
+        {
+            using var device = new ZkDevice(ip, port);
+            bool connected = await device.ConnectAsync();
+            if (!connected)
+            {
+                TxtDeviceStatus.Text = "❌ Failed to connect. Check IP and port.";
+                BtnDeviceConnect.IsEnabled = true;
+                return;
+            }
+
+            TxtDeviceStatus.Text = "Connected. Fetching attendance logs...";
+            var logs = device.GetAttendanceLogs();
+            device.Disconnect();
+
+            DeviceLogsGrid.ItemsSource = logs;
+            TxtDeviceStatus.Text = $"✅ Fetched {logs.Count} records from device.";
+        }
+        catch (Exception ex)
+        {
+            TxtDeviceStatus.Text = $"❌ Error: {ex.Message}";
+        }
+        BtnDeviceConnect.IsEnabled = true;
+    }
+
     private void BtnHelp_Click(object sender, RoutedEventArgs e)
     {
         var help = @"═══════════════════════════════════════════
