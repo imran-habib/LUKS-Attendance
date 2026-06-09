@@ -2,9 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 using ExcelDataReader;
 
@@ -13,25 +15,121 @@ namespace LuksAttendance;
 public class AttendanceData
 {
     public string Duration { get; set; } = "";
-    public List<(int Col, int DayNum, string DayName)> Days { get; set; } = new();
+    public List<DayInfo> Days { get; set; } = new();
     public List<EmployeeData> Employees { get; set; } = new();
+}
+
+public class DayInfo
+{
+    public int Col { get; set; }
+    public int DayNum { get; set; }
+    public string DayName { get; set; } = "";
+    public string DateLabel { get; set; } = ""; // e.g. "23-Jan (Fr)"
 }
 
 public class EmployeeData
 {
     public string No { get; set; } = "";
     public string Name { get; set; } = "";
-    public Dictionary<int, string> Punches { get; set; } = new();
+    public Dictionary<string, string> Punches { get; set; } = new(); // key = DateLabel
 }
 
 public static class FileReader
 {
+    private static readonly Regex DurationRe = new(@"(\d{4})/(\d{2})/(\d{2})\s*~\s*(\d{2})/(\d{2})");
+
     public static AttendanceData ReadAttendance(string path)
     {
         var ext = Path.GetExtension(path).ToLower();
         if (ext == ".xls")
             return ReadXls(path);
         return ReadXlsx(path);
+    }
+
+    /// <summary>Merge multiple attendance files into one dataset.</summary>
+    public static AttendanceData ReadMultiple(string[] paths)
+    {
+        var merged = new AttendanceData();
+        var empDict = new Dictionary<string, EmployeeData>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in paths)
+        {
+            var data = ReadAttendance(path);
+            if (string.IsNullOrEmpty(merged.Duration))
+                merged.Duration = data.Duration;
+            else
+                merged.Duration += " + " + data.Duration;
+
+            // Merge days (avoid duplicates by DateLabel)
+            var existingLabels = new HashSet<string>(merged.Days.Select(d => d.DateLabel));
+            foreach (var day in data.Days)
+            {
+                if (!existingLabels.Contains(day.DateLabel))
+                {
+                    merged.Days.Add(day);
+                    existingLabels.Add(day.DateLabel);
+                }
+            }
+
+            // Merge employees
+            foreach (var emp in data.Employees)
+            {
+                if (!empDict.TryGetValue(emp.Name, out var existing))
+                {
+                    existing = new EmployeeData { No = emp.No, Name = emp.Name };
+                    empDict[emp.Name] = existing;
+                }
+                foreach (var (label, punch) in emp.Punches)
+                {
+                    existing.Punches[label] = punch; // later file overwrites if same date
+                }
+            }
+        }
+
+        merged.Employees = empDict.Values.ToList();
+        // Sort days by actual date order
+        merged.Days = merged.Days.OrderBy(d => d.DayNum).ToList();
+        return merged;
+    }
+
+    private static List<DayInfo> BuildDayInfos(string duration, List<(int col, int dayNum, string dayName)> rawDays)
+    {
+        var result = new List<DayInfo>();
+        // Parse duration like "2026/01/23 ~ 01/29"
+        var match = DurationRe.Match(duration);
+        int year = 0, month = 0;
+        if (match.Success)
+        {
+            year = int.Parse(match.Groups[1].Value);
+            month = int.Parse(match.Groups[2].Value);
+        }
+
+        foreach (var (col, dayNum, dayName) in rawDays)
+        {
+            string label;
+            if (year > 0)
+            {
+                // Determine month: if dayNum < first day in list, it's next month
+                int firstDay = rawDays[0].dayNum;
+                int actualMonth = dayNum >= firstDay ? month : (month % 12) + 1;
+                int actualYear = dayNum >= firstDay ? year : (actualMonth == 1 ? year + 1 : year);
+                try
+                {
+                    var dt = new DateTime(actualYear, actualMonth, dayNum);
+                    label = $"{dayNum:D2}-{dt:MMM} ({dayName})";
+                }
+                catch
+                {
+                    label = $"{dayNum} ({dayName})";
+                }
+            }
+            else
+            {
+                label = $"{dayNum} ({dayName})";
+            }
+            result.Add(new DayInfo { Col = col, DayNum = dayNum, DayName = dayName, DateLabel = label });
+        }
+        return result;
     }
 
     private static AttendanceData ReadXls(string path)
@@ -43,12 +141,11 @@ public static class FileReader
         var table = ds.Tables[0];
 
         var data = new AttendanceData();
-
-        // Row 1 (index 1): duration in col 2
         if (table.Rows.Count > 1)
             data.Duration = table.Rows[1][2]?.ToString() ?? "";
 
-        // Row 2 (index 2): day numbers starting col 2
+        // Raw days from row 2 (index 2)
+        var rawDays = new List<(int col, int dayNum, string dayName)>();
         if (table.Rows.Count > 2)
         {
             var dayRow = table.Rows[2];
@@ -58,12 +155,13 @@ public static class FileReader
                 if (int.TryParse(val, out int dayNum))
                 {
                     var dayName = table.Rows.Count > 3 ? table.Rows[3][c]?.ToString()?.Trim() ?? "" : "";
-                    data.Days.Add((c, dayNum, dayName));
+                    rawDays.Add((c, dayNum, dayName));
                 }
             }
         }
 
-        // Row 4+: employees
+        data.Days = BuildDayInfos(data.Duration, rawDays);
+
         for (int r = 4; r < table.Rows.Count; r++)
         {
             var name = table.Rows[r][1]?.ToString()?.Trim() ?? "";
@@ -75,11 +173,11 @@ public static class FileReader
                 Name = name
             };
 
-            foreach (var (col, dayNum, _) in data.Days)
+            foreach (var day in data.Days)
             {
-                var cell = table.Rows[r][col]?.ToString()?.Trim() ?? "";
+                var cell = table.Rows[r][day.Col]?.ToString()?.Trim() ?? "";
                 if (!string.IsNullOrEmpty(cell))
-                    emp.Punches[dayNum] = cell;
+                    emp.Punches[day.DateLabel] = cell;
             }
             data.Employees.Add(emp);
         }
@@ -95,6 +193,7 @@ public static class FileReader
 
         data.Duration = ws.Cell(2, 3).GetString();
 
+        var rawDays = new List<(int col, int dayNum, string dayName)>();
         int lastCol = ws.LastColumnUsed()?.ColumnNumber() ?? 3;
         for (int c = 3; c <= lastCol; c++)
         {
@@ -102,9 +201,11 @@ public static class FileReader
             if (int.TryParse(val, out int dayNum))
             {
                 var dayName = ws.Cell(4, c).GetString().Trim();
-                data.Days.Add((c, dayNum, dayName));
+                rawDays.Add((c, dayNum, dayName));
             }
         }
+
+        data.Days = BuildDayInfos(data.Duration, rawDays);
 
         int lastRow = ws.LastRowUsed()?.RowNumber() ?? 5;
         for (int r = 5; r <= lastRow; r++)
@@ -118,11 +219,11 @@ public static class FileReader
                 Name = name
             };
 
-            foreach (var (col, dayNum, _) in data.Days)
+            foreach (var day in data.Days)
             {
-                var cell = ws.Cell(r, col).GetString().Trim();
+                var cell = ws.Cell(r, day.Col).GetString().Trim();
                 if (!string.IsNullOrEmpty(cell))
-                    emp.Punches[dayNum] = cell;
+                    emp.Punches[day.DateLabel] = cell;
             }
             data.Employees.Add(emp);
         }
@@ -135,7 +236,6 @@ public static class FileReader
     {
         var db = new List<EmployeeEntry>();
         var carryOver = new Dictionary<string, (decimal, decimal)>();
-
         if (!File.Exists(path)) return (db, carryOver);
 
         using var wb = new XLWorkbook(path);

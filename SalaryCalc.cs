@@ -11,7 +11,7 @@ namespace LuksAttendance;
 public class AttendanceRow
 {
     public string Name { get; set; } = "";
-    public int Day { get; set; }
+    public string Day { get; set; } = "";  // e.g. "23-Jan (Fr)"
     public string InTime { get; set; } = "";
     public string OutTime { get; set; } = "";
     public string Worked { get; set; } = "";
@@ -80,7 +80,7 @@ public static class SalaryCalc
     public static AttendanceRow BuildAttendanceRow(PunchRecord rec)
     {
         if (string.IsNullOrEmpty(rec.InTime) || string.IsNullOrEmpty(rec.OutTime))
-            return new AttendanceRow { Name = rec.Name, Day = rec.Day, Status = rec.Status };
+            return new AttendanceRow { Name = rec.Name, Day = rec.DayLabel, Status = rec.Status };
 
         var presence = CalcPresence(rec.InTime, rec.OutTime);
         presence = RoundToNearest(presence, RoundingMinutes);
@@ -89,7 +89,7 @@ public static class SalaryCalc
 
         return new AttendanceRow
         {
-            Name = rec.Name, Day = rec.Day,
+            Name = rec.Name, Day = rec.DayLabel,
             InTime = rec.InTime, OutTime = rec.OutTime,
             Worked = FormatTs(effective),
             OT = diff > TimeSpan.Zero ? FormatTs(diff) : "",
@@ -116,8 +116,6 @@ public static class SalaryCalc
         double dedH = Math.Round(totalDed.TotalHours, 2);
         double netH = Math.Round(otH - dedH, 2);
         double hourlyRate = dailyRate / 8.0;
-        decimal netSalary = Math.Round(
-            (decimal)(daysWorked * dailyRate + netH * hourlyRate) - advance + arrears, 2);
 
         var row2 = new SalaryRow
         {

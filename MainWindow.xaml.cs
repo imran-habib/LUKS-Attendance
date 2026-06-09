@@ -32,13 +32,18 @@ public partial class MainWindow : Window
         var dlg = new OpenFileDialog
         {
             Filter = "Excel Files|*.xls;*.xlsx",
-            Title = "Select Attendance File"
+            Title = "Select Attendance File(s) — hold Ctrl to select multiple",
+            Multiselect = true
         };
         if (dlg.ShowDialog() != true) return;
 
         try
         {
-            _data = FileReader.ReadAttendance(dlg.FileName);
+            if (dlg.FileNames.Length == 1)
+                _data = FileReader.ReadAttendance(dlg.FileNames[0]);
+            else
+                _data = FileReader.ReadMultiple(dlg.FileNames);
+
             var (records, issues) = PunchParser.Parse(_data);
 
             _attendanceRows.Clear();
@@ -56,14 +61,15 @@ public partial class MainWindow : Window
             BtnExportPdf.IsEnabled = true;
             BtnPrint.IsEnabled = true;
 
+            string fileInfo = dlg.FileNames.Length > 1 ? $"{dlg.FileNames.Length} files merged. " : "";
             if (_issueRows.Count > 0)
             {
                 IssuesTab.IsSelected = true;
-                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_issueRows.Count} issues to resolve. Salary calculated with available data.";
+                StatusText.Text = $"{fileInfo}Loaded {_data.Employees.Count} employees, {_data.Days.Count} days. {_issueRows.Count} issues to resolve.";
             }
             else
             {
-                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_attendanceRows.Count} records. Salary ready.";
+                StatusText.Text = $"{fileInfo}Loaded {_data.Employees.Count} employees, {_data.Days.Count} days. Salary ready.";
             }
         }
         catch (Exception ex)
@@ -104,7 +110,7 @@ public partial class MainWindow : Window
 
         var rec = new PunchRecord
         {
-            Name = issue.Name, Day = issue.Day,
+            Name = issue.Name, DayLabel = issue.DayLabel,
             InTime = issue.InTime, OutTime = time,
             Status = "hr_entered"
         };
@@ -176,20 +182,25 @@ HOW TO USE THIS SOFTWARE:
 ─────────────────────────────────────────
 
 STEP 1:  Click '📂 Load Attendance'
-         → Select the attendance file (.xls or .xlsx) 
+         → Select the attendance file (.xls or .xlsx)
            from the attendance machine.
+         → You can select MULTIPLE files (hold Ctrl)
+           if the week spans two months!
+           The system will merge them correctly.
 
 STEP 2:  Go to '⚠️ Issues' tab
-         → You will see employees with missing 
+         → You will see employees with missing
            OUT times (especially on the last day).
-         → Select each row, type the OUT time 
+         → Select each row, type the OUT time
            (e.g. 17:00) and click 'Resolve'.
          → Click 'Skip' if the employee was absent.
 
 STEP 3:  Check '📋 Attendance' tab
          → Review all attendance records.
-         → You CAN EDIT any cell if something is wrong.
-         → After editing, click '🔄 Recalculate' 
+         → Each row shows the DATE and DAY NAME.
+         → You CAN EDIT any cell if something is wrong
+           (e.g. wrong IN/OUT time was entered).
+         → After editing, click '🔄 Recalculate'
            to update the salary.
 
 STEP 4:  Check '💰 Salary' tab
@@ -205,11 +216,18 @@ STEP 5:  Export or Print
 ─────────────────────────────────────────
 IMPORTANT NOTES:
 
-• Worked hours = Time present minus 1 hour lunch
-  (lunch is only deducted if OUT time is after 1:00 PM)
+• Each day shows date and day name
+  (e.g. '23-Jan (Fr)' means January 23, Friday)
 
-• If someone leaves before 1:00 PM (half day), 
-  no lunch is deducted — all hours count.
+• If the week falls across two months,
+  select BOTH files when loading — they merge
+  automatically by date.
+
+• Worked hours = Time present minus 1 hour lunch
+  (lunch only deducted if OUT after 1:00 PM)
+
+• Half day (OUT before 1:00 PM) = no lunch deducted,
+  all hours count as work.
 
 • Standard working day = 8 hours
   More than 8h → Overtime (OT)

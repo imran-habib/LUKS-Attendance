@@ -1,4 +1,4 @@
-using System;
+#nullable enable
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -7,7 +7,7 @@ namespace LuksAttendance;
 public class PunchRecord
 {
     public string Name { get; set; } = "";
-    public int Day { get; set; }
+    public string DayLabel { get; set; } = ""; // e.g. "23-Jan (Fr)"
     public string InTime { get; set; } = "";
     public string OutTime { get; set; } = "";
     public string Status { get; set; } = "ok";
@@ -16,7 +16,7 @@ public class PunchRecord
 public class IssueRow
 {
     public string Name { get; set; } = "";
-    public int Day { get; set; }
+    public string DayLabel { get; set; } = "";
     public string Type { get; set; } = "";
     public string InTime { get; set; } = "";
     public string Raw { get; set; } = "";
@@ -30,33 +30,32 @@ public static class PunchParser
     {
         var records = new List<PunchRecord>();
         var issues = new List<IssueRow>();
-        int lastDay = data.Days.Count > 0 ? data.Days[^1].DayNum : 0;
+        string lastDayLabel = data.Days.Count > 0 ? data.Days[^1].DateLabel : "";
 
         foreach (var emp in data.Employees)
         {
-            foreach (var (_, dayNum, _) in data.Days)
+            foreach (var day in data.Days)
             {
-                if (!emp.Punches.TryGetValue(dayNum, out var raw)) continue;
+                if (!emp.Punches.TryGetValue(day.DateLabel, out var raw)) continue;
                 var times = TimeRe.Matches(raw);
                 if (times.Count == 0) continue;
 
-                bool isLastDay = dayNum == lastDay;
+                bool isLastDay = day.DateLabel == lastDayLabel;
 
                 if (times.Count == 1)
                 {
-                    var inTime = times[0].Value;
                     issues.Add(new IssueRow
                     {
-                        Name = emp.Name, Day = dayNum,
+                        Name = emp.Name, DayLabel = day.DateLabel,
                         Type = isLastDay ? "Last Day OUT" : "Missing OUT",
-                        InTime = inTime, Raw = raw.Replace("\n", " ").Trim()
+                        InTime = times[0].Value, Raw = raw.Replace("\n", " ").Trim()
                     });
                 }
                 else if (times.Count == 2)
                 {
                     records.Add(new PunchRecord
                     {
-                        Name = emp.Name, Day = dayNum,
+                        Name = emp.Name, DayLabel = day.DateLabel,
                         InTime = times[0].Value, OutTime = times[1].Value
                     });
                 }
@@ -73,13 +72,13 @@ public static class PunchParser
 
                     records.Add(new PunchRecord
                     {
-                        Name = emp.Name, Day = dayNum,
+                        Name = emp.Name, DayLabel = day.DateLabel,
                         InTime = inTime, OutTime = outTime,
                         Status = "multi_punch_verify"
                     });
                     issues.Add(new IssueRow
                     {
-                        Name = emp.Name, Day = dayNum,
+                        Name = emp.Name, DayLabel = day.DateLabel,
                         Type = "Multi-Punch (verify)",
                         InTime = inTime, Raw = raw.Replace("\n", " ").Trim()
                     });
