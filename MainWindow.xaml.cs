@@ -177,21 +177,40 @@ public partial class MainWindow : Window
         PdfExporter.Print(_salaryRows);
     }
 
-    private async void BtnDeviceFetch_Click(object sender, RoutedEventArgs e)
+    private ZkDevice? _device;
+    private Dictionary<string, string> _deviceUsers = new();
+
+    private async void BtnDeviceConnect_Click(object sender, RoutedEventArgs e)
     {
         var ip = TxtDeviceIp.Text.Trim();
         int port = int.TryParse(TxtDevicePort.Text.Trim(), out int p) ? p : 5005;
+
+        // If already connected, disconnect
+        if (_device != null)
+        {
+            _device.Disconnect();
+            _device = null;
+            BtnDeviceConnect.Content = "🔌 Connect";
+            BtnDeviceConnect.Background = System.Windows.Media.Brushes.LightGray;
+            PnlDeviceImport.Visibility = Visibility.Collapsed;
+            TxtDeviceStatus.Text = "Disconnected.";
+            return;
+        }
 
         BtnDeviceConnect.IsEnabled = false;
         TxtDeviceStatus.Text = $"Connecting to {ip}:{port}...";
 
         try
         {
-            using var device = new ZkDevice(ip, port);
-            bool connected = await device.ConnectAsync();
+            _device = new ZkDevice(ip, port);
+            bool connected = await _device.ConnectAsync();
+
             if (!connected)
             {
-                TxtDeviceStatus.Text = "❌ Failed to connect.";
+                _device = null;
+                BtnDeviceConnect.Background = System.Windows.Media.Brushes.IndianRed;
+                BtnDeviceConnect.Content = "🔌 Connect (Failed)";
+                TxtDeviceStatus.Text = "❌ Connection failed.";
                 MessageBox.Show(
                     $"Could not connect to device at {ip}:{port}\n\n" +
                     "Please check:\n" +
@@ -204,41 +223,87 @@ public partial class MainWindow : Window
                 return;
             }
 
-            TxtDeviceStatus.Text = "✅ Connected! Fetching attendance logs...";
-            var logs = device.GetAttendanceLogs();
-            device.Disconnect();
+            // Connected — fetch user list for name mapping
+            TxtDeviceStatus.Text = "✅ Connected! Fetching user list...";
+            _deviceUsers = _device.GetUsers();
 
-            DeviceLogsGrid.ItemsSource = logs;
-            TxtDeviceStatus.Text = $"✅ Done! Fetched {logs.Count} records.";
+            BtnDeviceConnect.Content = "🟢 Connected (Click to Disconnect)";
+            BtnDeviceConnect.Background = System.Windows.Media.Brushes.LightGreen;
+            PnlDeviceImport.Visibility = Visibility.Visible;
 
-            if (logs.Count > 0)
+            // Default date range: last 7 days
+            DpTo.SelectedDate = DateTime.Today;
+            DpFrom.SelectedDate = DateTime.Today.AddDays(-6);
+
+            TxtDeviceStatus.Text = $"✅ Connected! {_deviceUsers.Count} employees found on device. Select date range and click Import.";
+        }
+        catch (Exception ex)
+        {
+            _device = null;
+            BtnDeviceConnect.Background = System.Windows.Media.Brushes.IndianRed;
+            TxtDeviceStatus.Text = $"❌ Error: {ex.Message}";
+            MessageBox.Show($"Connection error:\n\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        BtnDeviceConnect.IsEnabled = true;
+    }
+
+    private void BtnDeviceImport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_device == null)
+        {
+            MessageBox.Show("Not connected to device. Click Connect first.", "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var fromDate = DpFrom.SelectedDate ?? DateTime.Today.AddDays(-6);
+        var toDate = DpTo.SelectedDate ?? DateTime.Today;
+
+        TxtDeviceStatus.Text = "Fetching attendance logs...";
+        try
+        {
+            var allLogs = _device.GetAttendanceLogs();
+
+            // Filter by date range
+            var filtered = allLogs.Where(l => l.Timestamp.Date >= fromDate.Date && l.Timestamp.Date <= toDate.Date).ToList();
+
+            // Map UserID to Name
+            foreach (var log in filtered)
             {
+                if (_deviceUsers.TryGetValue(log.UserId, out var name))
+                    log.UserName = name;
+                else
+                    log.UserName = $"Unknown ({log.UserId})";
+            }
+
+            DeviceLogsGrid.ItemsSource = filtered;
+            TxtDeviceStatus.Text = $"✅ Imported {filtered.Count} records ({fromDate:dd-MMM} to {toDate:dd-MMM}). Total on device: {allLogs.Count}";
+
+            if (filtered.Count > 0)
+            {
+                int employees = filtered.Select(l => l.UserId).Distinct().Count();
+                int days = filtered.Select(l => l.Timestamp.Date).Distinct().Count();
                 MessageBox.Show(
-                    $"✅ Successfully fetched {logs.Count} attendance records from device!\n\n" +
-                    $"Date range: {logs[0].Timestamp:dd-MMM-yyyy} to {logs[^1].Timestamp:dd-MMM-yyyy}\n\n" +
-                    "Records are shown in the grid below.",
-                    "Fetch Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                    $"✅ Import successful!\n\n" +
+                    $"• Records: {filtered.Count}\n" +
+                    $"• Employees: {employees}\n" +
+                    $"• Days: {days}\n" +
+                    $"• Period: {fromDate:dd-MMM-yyyy} to {toDate:dd-MMM-yyyy}\n\n" +
+                    "Data is shown in the grid. You can now review it.",
+                    "Import Successful", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
                 MessageBox.Show(
-                    "Connected successfully but no attendance records found.\n\n" +
-                    "This could mean:\n" +
-                    "• The device has no new records\n" +
-                    "• Records were already cleared\n" +
-                    "• Different firmware format (contact support)",
+                    $"No records found between {fromDate:dd-MMM-yyyy} and {toDate:dd-MMM-yyyy}.\n\n" +
+                    "Try expanding the date range.",
                     "No Records", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (Exception ex)
         {
-            TxtDeviceStatus.Text = $"❌ Error: {ex.Message}";
-            MessageBox.Show(
-                $"An error occurred while communicating with the device:\n\n{ex.Message}\n\n" +
-                "Try again, or load attendance from file instead.",
-                "Device Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            TxtDeviceStatus.Text = $"❌ Error fetching: {ex.Message}";
+            MessageBox.Show($"Error fetching logs:\n\n{ex.Message}", "Fetch Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-        BtnDeviceConnect.IsEnabled = true;
     }
 
     private void BtnHelp_Click(object sender, RoutedEventArgs e)

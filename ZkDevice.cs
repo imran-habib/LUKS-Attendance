@@ -24,6 +24,7 @@ public class ZkDevice : IDisposable
     private const ushort CMD_CONNECT = 1000;
     private const ushort CMD_EXIT = 1001;
     private const ushort CMD_ATTLOG_RRQ = 13;
+    private const ushort CMD_USERINFO_RRQ = 9;
     private const ushort CMD_DATA_RDY = 1500;
     private const ushort CMD_DATA = 1501;
     private const ushort CMD_ACK_OK = 2000;
@@ -116,6 +117,83 @@ public class ZkDevice : IDisposable
             _socket.Close();
             _socket = null;
         }
+    }
+
+    /// <summary>Fetch user list from device (UserID → Name mapping).</summary>
+    public Dictionary<string, string> GetUsers()
+    {
+        var users = new Dictionary<string, string>();
+        if (_socket == null) return users;
+
+        try
+        {
+            var cmd = CreatePacket(CMD_USERINFO_RRQ, null);
+            _socket.Send(cmd);
+
+            var reply = ReceiveReply();
+            if (reply == null) return users;
+
+            ushort command = GetCommand(reply);
+            byte[]? data = null;
+
+            if (command == CMD_PREPARE_DATA)
+            {
+                int dataSize = BitConverter.ToInt32(reply, 8);
+                data = ReceiveData(dataSize);
+                var freeCmd = CreatePacket(CMD_FREE_DATA, null);
+                _socket.Send(freeCmd);
+                ReceiveReply();
+            }
+            else if (command == CMD_DATA)
+            {
+                data = new byte[reply.Length - 8];
+                Array.Copy(reply, 8, data, 0, data.Length);
+            }
+
+            if (data != null)
+                users = ParseUsers(data);
+        }
+        catch { }
+        return users;
+    }
+
+    private static Dictionary<string, string> ParseUsers(byte[] data)
+    {
+        var users = new Dictionary<string, string>();
+        // User record is typically 72 bytes (varies by firmware)
+        int recordSize = 72;
+        if (data.Length < recordSize)
+        {
+            // Try 28-byte records (older firmware)
+            recordSize = 28;
+            if (data.Length < recordSize) return users;
+        }
+
+        for (int i = 0; i < data.Length - recordSize + 1; i += recordSize)
+        {
+            try
+            {
+                string uid;
+                string name;
+
+                if (recordSize == 72)
+                {
+                    // Format: 2 bytes padding + 9 bytes UID + 24 bytes name + rest
+                    uid = Encoding.ASCII.GetString(data, i + 2, 9).TrimEnd('\0').Trim();
+                    name = Encoding.UTF8.GetString(data, i + 11, 24).TrimEnd('\0').Trim();
+                }
+                else
+                {
+                    uid = BitConverter.ToUInt16(data, i).ToString();
+                    name = Encoding.UTF8.GetString(data, i + 2, 20).TrimEnd('\0').Trim();
+                }
+
+                if (!string.IsNullOrEmpty(uid) && !string.IsNullOrEmpty(name))
+                    users[uid] = name;
+            }
+            catch { }
+        }
+        return users;
     }
 
     public void Dispose() => Disconnect();
@@ -280,5 +358,6 @@ public class ZkDevice : IDisposable
 public class AttendanceLog
 {
     public string UserId { get; set; } = "";
+    public string UserName { get; set; } = "";
     public DateTime Timestamp { get; set; }
 }
