@@ -3,3 +3,4 @@
 *.so
 *.dylib
 /dist/
+__pycache__/
