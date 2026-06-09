@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -118,15 +119,18 @@ public static class SalaryCalc
         decimal netSalary = Math.Round(
             (decimal)(daysWorked * dailyRate + netH * hourlyRate) - advance + arrears, 2);
 
-        return new SalaryRow
+        var row2 = new SalaryRow
         {
             Name = string.Join(" ", nameKey.Split(' ').Select(w =>
                 char.ToUpper(w[0]) + w[1..])),
             Days = daysWorked, OtHours = otH, DedHours = dedH,
             NetHours = netH, DailyRate = dailyRate,
             HourlyRate = Math.Round(hourlyRate, 2),
-            _extraHrs = 0, _advance = advance, _arrears = arrears, _netSalary = netSalary
         };
+        row2.ExtraHrs = 0;
+        row2.Advance = advance;
+        row2.Arrears = arrears;
+        return row2;
     }
 
     private static TimeSpan CalcPresence(string inTime, string outTime)

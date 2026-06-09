@@ -1,4 +1,6 @@
+#nullable enable
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -39,22 +41,15 @@ public partial class MainWindow : Window
         {
             _data = FileReader.ReadAttendance(dlg.FileName);
             var (records, issues) = PunchParser.Parse(_data);
-            
+
             _attendanceRows.Clear();
             _issueRows.Clear();
 
-            // Show issues for resolution
             foreach (var issue in issues)
-            {
                 _issueRows.Add(issue);
-            }
 
-            // Add resolved records to attendance
             foreach (var rec in records)
-            {
-                var row = SalaryCalc.BuildAttendanceRow(rec);
-                _attendanceRows.Add(row);
-            }
+                _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
 
             if (_issueRows.Count > 0)
             {
@@ -92,7 +87,7 @@ public partial class MainWindow : Window
             _employeeDb.Clear();
             foreach (var entry in db) _employeeDb.Add(entry);
         }
-        StatusText.Text = $"Loaded previous data: {db.Count} employees, carry-over applied.";
+        StatusText.Text = $"Loaded previous data: {db.Count} employees.";
     }
 
     private void BtnResolve_Click(object sender, RoutedEventArgs e)
@@ -136,8 +131,7 @@ public partial class MainWindow : Window
 
         foreach (var grp in grouped.OrderBy(g => g.Key))
         {
-            var entry = dbDict.GetValueOrDefault(grp.Key);
-            if (entry == null) continue;
+            if (!dbDict.TryGetValue(grp.Key, out var entry)) continue;
             if (entry.Type == "excluded") continue;
             if (entry.Type == "monthly") continue;
 
