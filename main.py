@@ -9,8 +9,8 @@ from datetime import timedelta
 from src.file_io import read_attendance
 from src.parser import parse_punches, calc_worked_hours
 from src.salary_rules import (
-    EXCLUDED_FROM_SALARY, MONTHLY_WORKERS,
-    round_to_nearest, td_to_hhmm,
+    EXCLUDED_FROM_SALARY, MONTHLY_WORKERS, STANDARD_WORK_HOURS,
+    round_to_nearest, td_to_hhmm, calc_effective_hours,
     STANDARD_DAY_HOURS, ROUNDING_MINUTES
 )
 from src.exporter import generate_output, load_employee_db
@@ -151,7 +151,6 @@ def main():
             flagged.add((issue["name"], issue["day"]))
 
     # --- Build attendance output rows ---
-    standard = timedelta(hours=STANDARD_DAY_HOURS)
     attendance_rows = []
     emp_records = {}  # name_lower -> [records]
 
@@ -160,9 +159,12 @@ def main():
         name_lower = name.lower().strip()
 
         if rec.get("in_time") and rec.get("out_time"):
-            worked = calc_worked_hours(rec["in_time"], rec["out_time"])
-            worked = round_to_nearest(worked, ROUNDING_MINUTES)
-            diff = worked - standard
+            presence = calc_worked_hours(rec["in_time"], rec["out_time"])
+            presence = round_to_nearest(presence, ROUNDING_MINUTES)
+            # Effective work: deduct lunch if OUT >= 13:00
+            effective = calc_effective_hours(presence, rec["out_time"])
+            worked = effective
+            diff = effective - timedelta(hours=STANDARD_WORK_HOURS)
             ot = diff if diff > timedelta(0) else timedelta(0)
             ded = abs(diff) if diff < timedelta(0) else timedelta(0)
         else:
@@ -212,9 +214,10 @@ def main():
 
         for r in recs:
             if r.get("in_time") and r.get("out_time"):
-                w = calc_worked_hours(r["in_time"], r["out_time"])
-                w = round_to_nearest(w, ROUNDING_MINUTES)
-                diff = w - standard
+                presence = calc_worked_hours(r["in_time"], r["out_time"])
+                presence = round_to_nearest(presence, ROUNDING_MINUTES)
+                effective = calc_effective_hours(presence, r["out_time"])
+                diff = effective - timedelta(hours=STANDARD_WORK_HOURS)
                 if diff > timedelta(0):
                     total_ot += diff
                 elif diff < timedelta(0):

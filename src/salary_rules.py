@@ -2,9 +2,12 @@
 from datetime import timedelta
 
 # --- Configuration ---
-STANDARD_DAY_HOURS = 9  # including 1h lunch
-HOURLY_DIVISOR = 8      # daily_rate / 8 = hourly_rate
-ROUNDING_MINUTES = 15   # round worked hours to nearest 15 min
+STANDARD_WORK_HOURS = 8   # effective working hours expected per day
+LUNCH_BREAK_HOURS = 1     # lunch deducted if OUT >= 13:00
+LUNCH_CUTOFF = "13:00"    # if OUT before this, no lunch deduction
+HOURLY_DIVISOR = 8        # daily_rate / 8 = hourly_rate
+ROUNDING_MINUTES = 15     # round worked hours to nearest 15 min
+STANDARD_DAY_HOURS = 9    # total presence expected (work + lunch)
 
 # Excluded from salary (owners/managers) - just track presence
 EXCLUDED_FROM_SALARY = {
@@ -12,7 +15,7 @@ EXCLUDED_FROM_SALARY = {
     "khyber lala", "zameer ustad"
 }
 
-# Monthly workers (show only on first Thursday of month)
+# Monthly workers
 MONTHLY_WORKERS = {
     "arif chacha", "hafeez chacha", "kamran"
 }
@@ -24,6 +27,30 @@ def round_to_nearest(td, minutes=ROUNDING_MINUTES):
     chunk = minutes * 60
     rounded = round(total_seconds / chunk) * chunk
     return timedelta(seconds=rounded)
+
+
+def calc_effective_hours(presence_td, out_time_str):
+    """Calculate effective working hours from presence duration.
+    
+    Rules:
+    - If OUT >= 13:00: deduct 1h lunch. Effective = presence - 1h.
+    - If OUT < 13:00: no lunch deduction. Effective = presence.
+    
+    Returns: (effective_work timedelta, is_half_day bool)
+    """
+    out_hour = int(out_time_str.split(":")[0])
+    out_min = int(out_time_str.split(":")[1])
+    out_total = out_hour * 60 + out_min
+    lunch_cutoff = 13 * 60  # 13:00 in minutes
+    
+    if out_total >= lunch_cutoff:
+        # Full day: deduct lunch
+        effective = presence_td - timedelta(hours=LUNCH_BREAK_HOURS)
+    else:
+        # Half day: no lunch deduction
+        effective = presence_td
+    
+    return effective
 
 
 def td_to_hhmm(td):
