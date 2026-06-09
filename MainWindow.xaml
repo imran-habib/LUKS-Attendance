@@ -39,7 +39,18 @@
         <!-- Main Tab Control -->
         <TabControl Grid.Row="2" x:Name="MainTabs" Margin="5" FontSize="14">
             <TabItem Header="📋 Attendance">
-                <DataGrid x:Name="AttendanceGrid" CanUserDeleteRows="False" CanUserAddRows="False" FontSize="13"/>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DataGrid x:Name="AttendanceGrid" Grid.Row="0" CanUserDeleteRows="True" CanUserAddRows="True" FontSize="13"/>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8">
+                        <Button Content="➕ Add Manual Entry" Click="BtnAddManualAttendance_Click" Padding="12,6" FontSize="14" Margin="0,0,10,0"/>
+                        <TextBlock Text="(For workers not on the machine — add name, day, IN/OUT times, then click Recalculate)"
+                                   VerticalAlignment="Center" FontSize="12" Foreground="Gray"/>
+                    </StackPanel>
+                </Grid>
             </TabItem>
             <TabItem Header="💰 Salary">
                 <DataGrid x:Name="SalaryGrid" FontSize="13"/>

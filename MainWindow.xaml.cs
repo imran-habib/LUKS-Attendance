@@ -135,6 +135,23 @@ public partial class MainWindow : Window
         StatusText.Text = "Salary recalculated from attendance data.";
     }
 
+    private void BtnAddManualAttendance_Click(object sender, RoutedEventArgs e)
+    {
+        _attendanceRows.Add(new AttendanceRow
+        {
+            Name = "(Enter Name)",
+            Day = DateTime.Today.ToString("dd-MMM (ddd)"),
+            InTime = "08:00",
+            OutTime = "17:00",
+            Worked = "08:00",
+            OT = "",
+            Deduction = "",
+            Status = "manual"
+        });
+        AttendanceGrid.ScrollIntoView(_attendanceRows[^1]);
+        StatusText.Text = "Manual entry added. Edit the name, day, and times, then click Recalculate.";
+    }
+
     private void CalculateSalary()
     {
         _salaryRows.Clear();
