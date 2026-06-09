@@ -42,18 +42,17 @@ public static class PdfExporter
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.RelativeColumn(2); // Category
-                        cols.RelativeColumn(3); // Name
-                        cols.RelativeColumn(1); // Days
-                        cols.RelativeColumn(1); // OT
-                        cols.RelativeColumn(1); // Ded
-                        cols.RelativeColumn(1); // Net
-                        cols.RelativeColumn(1.5f); // Daily
-                        cols.RelativeColumn(1); // Hourly
-                        cols.RelativeColumn(1); // Extra
-                        cols.RelativeColumn(1.5f); // Advance
-                        cols.RelativeColumn(1.5f); // Arrears
-                        cols.RelativeColumn(2); // Net Salary
+                        cols.RelativeColumn(2.5f); // Category
+                        cols.RelativeColumn(3);   // Name
+                        cols.ConstantColumn(30);  // Days
+                        cols.ConstantColumn(35);  // OT
+                        cols.ConstantColumn(45);  // Deduction
+                        cols.ConstantColumn(40);  // Net Hrs
+                        cols.ConstantColumn(45);  // Daily Rs
+                        cols.ConstantColumn(38);  // Hr Rs
+                        cols.ConstantColumn(50);  // Advance
+                        cols.ConstantColumn(45);  // Arrears
+                        cols.ConstantColumn(60);  // Net Salary
                     });
 
                     table.Header(h =>
@@ -62,11 +61,10 @@ public static class PdfExporter
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Name").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Days").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("OT").Bold().FontSize(8).FontColor(Colors.White);
-                        h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Ded").Bold().FontSize(8).FontColor(Colors.White);
+                        h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Deduction").Bold().FontSize(7).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Net Hrs").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Daily Rs").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Hr Rs").Bold().FontSize(8).FontColor(Colors.White);
-                        h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Extra").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Advance").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Arrears").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Net Salary").Bold().FontSize(8).FontColor(Colors.White);
@@ -83,14 +81,13 @@ public static class PdfExporter
                         table.Cell().Border(0.5f).Padding(3).Text(r.NetHours.ToString("F1")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.DailyRate.ToString()).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.HourlyRate.ToString("F0")).FontSize(8);
-                        table.Cell().Border(0.5f).Padding(3).Text(r.ExtraHrs.ToString("F1")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.Advance.ToString("F0")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.Arrears.ToString("F0")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.NetSalary.ToString("N0")).FontSize(8).Bold();
                     }
 
                     // Total
-                    for (int i = 0; i < 11; i++)
+                    for (int i = 0; i < 10; i++)
                         table.Cell().Border(0.5f).Padding(3).Text(i == 1 ? "TOTAL" : "").Bold().FontSize(8);
                     table.Cell().Border(0.5f).Padding(3)
                         .Text(salary.Sum(s => s.NetSalary).ToString("N0")).Bold().FontSize(9);
