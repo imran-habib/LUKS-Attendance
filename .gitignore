@@ -1,6 +1,10 @@
+bin/
+obj/
+publish/
 *.exe
 *.dll
-*.so
-*.dylib
-/dist/
+*.pdb
+*.user
+.vs/
 __pycache__/
+*.pyc
