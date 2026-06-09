@@ -12,26 +12,30 @@
         </Grid.RowDefinitions>
 
         <!-- Top Toolbar -->
-        <ToolBar Grid.Row="0" Margin="5">
-            <Button x:Name="BtnLoad" Content="📂 Load Attendance" Click="BtnLoad_Click" Padding="8,4"/>
+        <ToolBar Grid.Row="0" Margin="5" Height="50">
+            <Button x:Name="BtnLoad" Content="📂 Load Attendance" Click="BtnLoad_Click" Padding="14,8" FontSize="14" Margin="3,0"/>
             <Separator/>
-            <Button x:Name="BtnPrevious" Content="📁 Load Previous" Click="BtnPrevious_Click" Padding="8,4"/>
+            <Button x:Name="BtnPrevious" Content="📁 Load Previous" Click="BtnPrevious_Click" Padding="14,8" FontSize="14" Margin="3,0"/>
             <Separator/>
-            <Button x:Name="BtnExportExcel" Content="📊 Export Excel" Click="BtnExportExcel_Click" Padding="8,4" IsEnabled="False"/>
-            <Button x:Name="BtnExportPdf" Content="📄 Export PDF" Click="BtnExportPdf_Click" Padding="8,4" IsEnabled="False"/>
-            <Button x:Name="BtnPrint" Content="🖨️ Print" Click="BtnPrint_Click" Padding="8,4" IsEnabled="False"/>
+            <Button x:Name="BtnExportExcel" Content="📊 Export Excel" Click="BtnExportExcel_Click" Padding="14,8" FontSize="14" Margin="3,0" IsEnabled="False"/>
+            <Button x:Name="BtnExportPdf" Content="📄 Export PDF" Click="BtnExportPdf_Click" Padding="14,8" FontSize="14" Margin="3,0" IsEnabled="False"/>
+            <Button x:Name="BtnPrint" Content="🖨️ Print" Click="BtnPrint_Click" Padding="14,8" FontSize="14" Margin="3,0" IsEnabled="False"/>
+            <Separator/>
+            <Button x:Name="BtnRecalc" Content="🔄 Recalculate" Click="BtnRecalc_Click" Padding="14,8" FontSize="14" Margin="3,0" IsEnabled="False" ToolTip="Click after editing Attendance data to update Salary"/>
+            <Separator/>
+            <Button Content="❓ Help" Click="BtnHelp_Click" Padding="14,8" FontSize="14" Margin="3,0"/>
         </ToolBar>
 
         <!-- Main Tab Control -->
-        <TabControl Grid.Row="1" x:Name="MainTabs" Margin="5">
+        <TabControl Grid.Row="1" x:Name="MainTabs" Margin="5" FontSize="14">
             <TabItem Header="📋 Attendance">
-                <DataGrid x:Name="AttendanceGrid" IsReadOnly="True"/>
+                <DataGrid x:Name="AttendanceGrid" CanUserDeleteRows="False" CanUserAddRows="False" FontSize="13"/>
             </TabItem>
             <TabItem Header="💰 Salary">
-                <DataGrid x:Name="SalaryGrid"/>
+                <DataGrid x:Name="SalaryGrid" FontSize="13"/>
             </TabItem>
             <TabItem Header="👥 Employee DB">
-                <DataGrid x:Name="EmployeeGrid"/>
+                <DataGrid x:Name="EmployeeGrid" FontSize="13"/>
             </TabItem>
             <TabItem Header="⚠️ Issues" x:Name="IssuesTab">
                 <Grid>
@@ -39,12 +43,12 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <DataGrid x:Name="IssuesGrid" Grid.Row="0"/>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5">
-                        <TextBlock Text="OUT Time: " VerticalAlignment="Center"/>
-                        <TextBox x:Name="TxtResolveTime" Width="80" Margin="5,0"/>
-                        <Button Content="✔ Resolve Selected" Click="BtnResolve_Click" Padding="8,4" Margin="5,0"/>
-                        <Button Content="Skip Selected" Click="BtnSkip_Click" Padding="8,4"/>
+                    <DataGrid x:Name="IssuesGrid" Grid.Row="0" FontSize="13"/>
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8">
+                        <TextBlock Text="OUT Time:" VerticalAlignment="Center" FontSize="14" Margin="0,0,5,0"/>
+                        <TextBox x:Name="TxtResolveTime" Width="90" FontSize="14" VerticalContentAlignment="Center" Padding="4"/>
+                        <Button Content="✔ Resolve Selected" Click="BtnResolve_Click" Padding="12,6" FontSize="14" Margin="8,0"/>
+                        <Button Content="Skip Selected" Click="BtnSkip_Click" Padding="12,6" FontSize="14" Margin="4,0"/>
                     </StackPanel>
                 </Grid>
             </TabItem>
@@ -52,7 +56,7 @@
 
         <!-- Status Bar -->
         <StatusBar Grid.Row="2">
-            <TextBlock x:Name="StatusText" Text="Ready. Load an attendance file to begin."/>
+            <TextBlock x:Name="StatusText" Text="Ready. Load an attendance file to begin." FontSize="13"/>
         </StatusBar>
     </Grid>
 </Window>

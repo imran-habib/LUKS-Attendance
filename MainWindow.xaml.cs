@@ -50,8 +50,11 @@ public partial class MainWindow : Window
             foreach (var rec in records)
                 _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
 
-            // Always calculate salary with available data
             CalculateSalary();
+            BtnRecalc.IsEnabled = true;
+            BtnExportExcel.IsEnabled = true;
+            BtnExportPdf.IsEnabled = true;
+            BtnPrint.IsEnabled = true;
 
             if (_issueRows.Count > 0)
             {
@@ -62,10 +65,6 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_attendanceRows.Count} records. Salary ready.";
             }
-
-            BtnExportExcel.IsEnabled = true;
-            BtnExportPdf.IsEnabled = true;
-            BtnPrint.IsEnabled = true;
         }
         catch (Exception ex)
         {
@@ -78,7 +77,7 @@ public partial class MainWindow : Window
         var dlg = new OpenFileDialog
         {
             Filter = "Excel Files|*.xlsx",
-            Title = "Select Previous Salary Sheet (for carry-over)"
+            Title = "Select Previous Salary Sheet"
         };
         if (dlg.ShowDialog() != true) return;
         _previousFilePath = dlg.FileName;
@@ -123,6 +122,12 @@ public partial class MainWindow : Window
         StatusText.Text = $"Skipped. {_issueRows.Count} issues remaining.";
     }
 
+    private void BtnRecalc_Click(object sender, RoutedEventArgs e)
+    {
+        CalculateSalary();
+        StatusText.Text = "Salary recalculated from attendance data.";
+    }
+
     private void CalculateSalary()
     {
         _salaryRows.Clear();
@@ -159,6 +164,69 @@ public partial class MainWindow : Window
     private void BtnPrint_Click(object sender, RoutedEventArgs e)
     {
         PdfExporter.Print(_salaryRows);
+    }
+
+    private void BtnHelp_Click(object sender, RoutedEventArgs e)
+    {
+        var help = @"═══════════════════════════════════════════
+         LUKS Attendance & Salary - Help
+═══════════════════════════════════════════
+
+HOW TO USE THIS SOFTWARE:
+─────────────────────────────────────────
+
+STEP 1:  Click '📂 Load Attendance'
+         → Select the attendance file (.xls or .xlsx) 
+           from the attendance machine.
+
+STEP 2:  Go to '⚠️ Issues' tab
+         → You will see employees with missing 
+           OUT times (especially on the last day).
+         → Select each row, type the OUT time 
+           (e.g. 17:00) and click 'Resolve'.
+         → Click 'Skip' if the employee was absent.
+
+STEP 3:  Check '📋 Attendance' tab
+         → Review all attendance records.
+         → You CAN EDIT any cell if something is wrong.
+         → After editing, click '🔄 Recalculate' 
+           to update the salary.
+
+STEP 4:  Check '💰 Salary' tab
+         → Review each employee's salary.
+         → You can edit Advance, Arrears, and Extra Hrs.
+         → Net Salary updates automatically.
+
+STEP 5:  Export or Print
+         → '📊 Export Excel' saves a full Excel file.
+         → '📄 Export PDF' saves a PDF for records.
+         → '🖨️ Print' sends to your printer.
+
+─────────────────────────────────────────
+IMPORTANT NOTES:
+
+• Worked hours = Time present minus 1 hour lunch
+  (lunch is only deducted if OUT time is after 1:00 PM)
+
+• If someone leaves before 1:00 PM (half day), 
+  no lunch is deducted — all hours count.
+
+• Standard working day = 8 hours
+  More than 8h → Overtime (OT)
+  Less than 8h → Deduction
+
+• Hourly Rate = Daily Rate ÷ 8
+
+• Hours are rounded to nearest 15 minutes.
+
+• '👥 Employee DB' tab has all employee rates.
+  You can edit rates here.
+
+• '📁 Load Previous' loads last week's salary file
+  to carry over the Employee DB rates.
+═══════════════════════════════════════════";
+
+        MessageBox.Show(help, "Help - How to Use", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void LoadDefaultEmployeeDb()
