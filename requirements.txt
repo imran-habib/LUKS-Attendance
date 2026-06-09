@@ -1,0 +1,4 @@
+"""requirements.txt for LUKS-Attendance"""
+openpyxl==3.1.5
+xlrd==2.0.1
+pyinstaller==6.11.0
