@@ -33,6 +33,7 @@ public class SalaryRow : INotifyPropertyChanged
             - _advance + _arrears, 2);
     }
 
+    public string Category { get; set; } = "";
     public string Name { get; set; } = "";
     public int Days { get; set; }
     public double OtHours { get; set; }
@@ -99,7 +100,7 @@ public static class SalaryCalc
     }
 
     public static SalaryRow Calculate(string nameKey, List<AttendanceRow> rows, int dailyRate,
-        decimal advance, decimal arrears)
+        decimal advance, decimal arrears, string category = "")
     {
         var totalOt = TimeSpan.Zero;
         var totalDed = TimeSpan.Zero;
@@ -119,6 +120,7 @@ public static class SalaryCalc
 
         var row2 = new SalaryRow
         {
+            Category = category,
             Name = string.Join(" ", nameKey.Split(' ').Select(w =>
                 char.ToUpper(w[0]) + w[1..])),
             Days = daysWorked, OtHours = otH, DedHours = dedH,

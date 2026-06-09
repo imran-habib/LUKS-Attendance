@@ -248,8 +248,9 @@ public static class FileReader
                 var name = wsDb.Cell(r, 1).GetString().Trim();
                 var rate = (int)wsDb.Cell(r, 2).GetDouble();
                 var type = wsDb.Cell(r, 3).GetString().Trim().ToLower();
+                var category = wsDb.Cell(r, 4).GetString().Trim();
                 if (!string.IsNullOrEmpty(name))
-                    db.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type });
+                    db.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type, Category = category });
             }
         }
 

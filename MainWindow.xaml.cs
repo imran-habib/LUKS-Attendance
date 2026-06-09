@@ -146,24 +146,29 @@ public partial class MainWindow : Window
             if (entry.Type == "excluded") continue;
             if (entry.Type == "monthly") continue;
 
-            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0);
+            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
             _salaryRows.Add(sal);
         }
     }
 
+    private string GetDateSuffix()
+    {
+        return _data?.Duration?.Replace("/", "-").Replace(" ~ ", "_to_").Replace(" + ", "_") ?? DateTime.Now.ToString("yyyy-MM-dd");
+    }
+
     private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = "Salary_Sheet.xlsx" };
+        var dlg = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"Salary_Sheet_{GetDateSuffix()}.xlsx" };
         if (dlg.ShowDialog() != true) return;
-        ExcelExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _employeeDb);
+        ExcelExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _employeeDb, _data?.Duration ?? "");
         StatusText.Text = $"Excel exported: {dlg.FileName}";
     }
 
     private void BtnExportPdf_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new SaveFileDialog { Filter = "PDF|*.pdf", FileName = "Salary_Sheet.pdf" };
+        var dlg = new SaveFileDialog { Filter = "PDF|*.pdf", FileName = $"Salary_Sheet_{GetDateSuffix()}.pdf" };
         if (dlg.ShowDialog() != true) return;
-        PdfExporter.Export(dlg.FileName, _attendanceRows, _salaryRows);
+        PdfExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _data?.Duration ?? "");
         StatusText.Text = $"PDF exported: {dlg.FileName}";
     }
 
@@ -249,7 +254,7 @@ IMPORTANT NOTES:
 
     private void LoadDefaultEmployeeDb()
     {
-        foreach (var (name, rate, type) in DefaultData.Employees)
-            _employeeDb.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type });
+        foreach (var (name, rate, type, category) in DefaultData.Employees)
+            _employeeDb.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type, Category = category });
     }
 }

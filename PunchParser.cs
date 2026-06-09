@@ -7,7 +7,7 @@ namespace LuksAttendance;
 public class PunchRecord
 {
     public string Name { get; set; } = "";
-    public string DayLabel { get; set; } = ""; // e.g. "23-Jan (Fr)"
+    public string DayLabel { get; set; } = "";
     public string InTime { get; set; } = "";
     public string OutTime { get; set; } = "";
     public string Status { get; set; } = "ok";
@@ -19,7 +19,7 @@ public class IssueRow
     public string DayLabel { get; set; } = "";
     public string Type { get; set; } = "";
     public string InTime { get; set; } = "";
-    public string Raw { get; set; } = "";
+    public string OutTime { get; set; } = ""; // was "Raw", now shows expected OUT time needed
 }
 
 public static class PunchParser
@@ -48,7 +48,8 @@ public static class PunchParser
                     {
                         Name = emp.Name, DayLabel = day.DateLabel,
                         Type = isLastDay ? "Last Day OUT" : "Missing OUT",
-                        InTime = times[0].Value, Raw = raw.Replace("\n", " ").Trim()
+                        InTime = times[0].Value,
+                        OutTime = "?" // needs HR input
                     });
                 }
                 else if (times.Count == 2)
@@ -61,7 +62,6 @@ public static class PunchParser
                 }
                 else
                 {
-                    // 3+ punches: first >= 06:00 is IN, last is OUT
                     string inTime = times[0].Value;
                     for (int i = 0; i < times.Count; i++)
                     {
@@ -80,7 +80,8 @@ public static class PunchParser
                     {
                         Name = emp.Name, DayLabel = day.DateLabel,
                         Type = "Multi-Punch (verify)",
-                        InTime = inTime, Raw = raw.Replace("\n", " ").Trim()
+                        InTime = inTime,
+                        OutTime = outTime + " (auto)"
                     });
                 }
             }
