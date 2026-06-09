@@ -137,19 +137,42 @@ public partial class MainWindow : Window
 
     private void BtnAddManualAttendance_Click(object sender, RoutedEventArgs e)
     {
-        _attendanceRows.Add(new AttendanceRow
+        // Get employee names from DB for live search
+        var names = _employeeDb.Select(emp => emp.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+
+        // Get available days from existing attendance data (or generate from date range)
+        var days = _attendanceRows.Select(r => r.Day).Distinct().OrderBy(d => d).ToList();
+        if (days.Count == 0)
         {
-            Name = "(Enter Name)",
-            Day = DateTime.Today.ToString("dd-MMM (ddd)"),
-            InTime = "08:00",
-            OutTime = "17:00",
-            Worked = "08:00",
-            OT = "",
-            Deduction = "",
-            Status = "manual"
-        });
-        AttendanceGrid.ScrollIntoView(_attendanceRows[^1]);
-        StatusText.Text = "Manual entry added. Edit the name, day, and times, then click Recalculate.";
+            // No data loaded yet, use last 7 days
+            for (int i = 6; i >= 0; i--)
+            {
+                var dt = DateTime.Today.AddDays(-i);
+                days.Add(dt.ToString("dd-MMM (ddd)"));
+            }
+        }
+
+        var dlg = new ManualEntryDialog(names, days) { Owner = this };
+        dlg.ShowDialog();
+
+        if (!dlg.Confirmed) return;
+
+        // Add attendance rows for all selected days
+        foreach (var day in dlg.SelectedDays)
+        {
+            var rec = new PunchRecord
+            {
+                Name = dlg.SelectedName,
+                DayLabel = day,
+                InTime = dlg.InTime,
+                OutTime = dlg.OutTime,
+                Status = "manual"
+            };
+            _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+        }
+
+        CalculateSalary();
+        StatusText.Text = $"Added {dlg.SelectedDays.Count} manual entries for {dlg.SelectedName}.";
     }
 
     private void CalculateSalary()
