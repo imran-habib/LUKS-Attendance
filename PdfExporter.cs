@@ -29,9 +29,13 @@ public static class PdfExporter
 
                 page.Header().Row(row =>
                 {
-                    row.RelativeItem(2).AlignLeft().Height(40).Image("assets/logo_transparent.png");
+                    var logoPath = GetLogoPath();
+                    if (logoPath != null)
+                        row.RelativeItem(2).AlignLeft().Height(36).Image(logoPath);
+                    else
+                        row.RelativeItem(2).AlignLeft().Text("LUKS").FontSize(20).Bold();
                     row.RelativeItem(8).AlignCenter().PaddingTop(8)
-                        .Text($"LUKS SALARY SHEET — {duration}").FontSize(16).Bold();
+                        .Text($"SALARY SHEET — {duration}").FontSize(16).Bold();
                 });
 
                 page.Content().PaddingTop(10).Table(table =>
@@ -99,6 +103,37 @@ public static class PdfExporter
                 });
             });
         }).GeneratePdf(path);
+    }
+
+    private static string? GetLogoPath()
+    {
+        // Try to find logo relative to exe location
+        var exeDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".";
+        var candidates = new[]
+        {
+            System.IO.Path.Combine(exeDir, "assets", "logo_transparent.png"),
+            System.IO.Path.Combine(exeDir, "Assets", "logo_transparent.png"),
+            "assets/logo_transparent.png",
+            "Assets/logo_transparent.png"
+        };
+        foreach (var p in candidates)
+            if (System.IO.File.Exists(p)) return p;
+
+        // Extract from embedded resource to temp
+        try
+        {
+            var uri = new System.Uri("pack://application:,,,/assets/logo_transparent.png");
+            var stream = System.Windows.Application.GetResourceStream(uri)?.Stream;
+            if (stream != null)
+            {
+                var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "luks_logo.png");
+                using var fs = System.IO.File.Create(tempPath);
+                stream.CopyTo(fs);
+                return tempPath;
+            }
+        }
+        catch { }
+        return null;
     }
 
     public static void Print(ObservableCollection<SalaryRow> salary)
