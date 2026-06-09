@@ -29,7 +29,7 @@ public static class PdfExporter
 
                 page.Header().Row(row =>
                 {
-                    row.RelativeItem(2).AlignLeft().Height(40).Image("Assets/logo.png");
+                    row.RelativeItem(2).AlignLeft().Height(40).Image("assets/logo_transparent.png");
                     row.RelativeItem(8).AlignCenter().PaddingTop(8)
                         .Text($"LUKS SALARY SHEET — {duration}").FontSize(16).Bold();
                 });

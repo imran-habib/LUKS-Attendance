@@ -15,7 +15,7 @@
         <!-- Logo Header -->
         <Border Grid.Row="0" Background="#1a237e" Padding="10,8">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Image Source="Assets/logo.png" Height="40" Margin="0,0,12,0"/>
+                <Image Source="assets/logo_transparent.png" Height="42" Margin="0,0,12,0"/>
                 <TextBlock Text="LUKS SALARY SOFTWARE" FontSize="22" FontWeight="Bold"
                            Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
