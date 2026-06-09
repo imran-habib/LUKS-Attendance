@@ -13,12 +13,12 @@
         </Grid.RowDefinitions>
 
         <!-- Logo Header -->
-        <Border Grid.Row="0" Background="#1a237e" Padding="10,8">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Image Source="assets/logo_transparent.png" Height="36" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <TextBlock Text="SALARY SOFTWARE" FontSize="20" FontWeight="Bold"
-                           Foreground="White" VerticalAlignment="Center"/>
-            </StackPanel>
+        <Border Grid.Row="0" Background="#1a237e" Padding="8,6">
+            <Grid>
+                <Image Source="assets/logo_transparent.png" Height="28" HorizontalAlignment="Left" Margin="10,0,0,0"/>
+                <TextBlock Text="SALARY SOFTWARE" FontSize="24" FontWeight="Bold"
+                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
         </Border>
 
         <!-- Toolbar -->
