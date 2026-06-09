@@ -191,21 +191,52 @@ public partial class MainWindow : Window
             bool connected = await device.ConnectAsync();
             if (!connected)
             {
-                TxtDeviceStatus.Text = "❌ Failed to connect. Check IP and port.";
+                TxtDeviceStatus.Text = "❌ Failed to connect.";
+                MessageBox.Show(
+                    $"Could not connect to device at {ip}:{port}\n\n" +
+                    "Please check:\n" +
+                    "• Is the attendance machine turned on?\n" +
+                    "• Is this PC on the same network (192.168.1.x)?\n" +
+                    "• Is the IP and Port correct?\n" +
+                    "• Is the Ethernet cable connected to the machine?",
+                    "Connection Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 BtnDeviceConnect.IsEnabled = true;
                 return;
             }
 
-            TxtDeviceStatus.Text = "Connected. Fetching attendance logs...";
+            TxtDeviceStatus.Text = "✅ Connected! Fetching attendance logs...";
             var logs = device.GetAttendanceLogs();
             device.Disconnect();
 
             DeviceLogsGrid.ItemsSource = logs;
-            TxtDeviceStatus.Text = $"✅ Fetched {logs.Count} records from device.";
+            TxtDeviceStatus.Text = $"✅ Done! Fetched {logs.Count} records.";
+
+            if (logs.Count > 0)
+            {
+                MessageBox.Show(
+                    $"✅ Successfully fetched {logs.Count} attendance records from device!\n\n" +
+                    $"Date range: {logs[0].Timestamp:dd-MMM-yyyy} to {logs[^1].Timestamp:dd-MMM-yyyy}\n\n" +
+                    "Records are shown in the grid below.",
+                    "Fetch Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(
+                    "Connected successfully but no attendance records found.\n\n" +
+                    "This could mean:\n" +
+                    "• The device has no new records\n" +
+                    "• Records were already cleared\n" +
+                    "• Different firmware format (contact support)",
+                    "No Records", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         catch (Exception ex)
         {
             TxtDeviceStatus.Text = $"❌ Error: {ex.Message}";
+            MessageBox.Show(
+                $"An error occurred while communicating with the device:\n\n{ex.Message}\n\n" +
+                "Try again, or load attendance from file instead.",
+                "Device Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         BtnDeviceConnect.IsEnabled = true;
     }
