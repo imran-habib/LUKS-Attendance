@@ -138,8 +138,15 @@ public partial class MainWindow : Window
     private void CalculateSalary()
     {
         _salaryRows.Clear();
-        var dbDict = _employeeDb.ToDictionary(e => e.Name.ToLower(), e => e);
-        var grouped = _attendanceRows.GroupBy(r => r.Name.ToLower());
+        // Use first occurrence if duplicate names exist
+        var dbDict = new Dictionary<string, EmployeeEntry>(StringComparer.OrdinalIgnoreCase);
+        foreach (var emp in _employeeDb)
+        {
+            var key = emp.Name.ToLower();
+            if (!string.IsNullOrWhiteSpace(key) && !dbDict.ContainsKey(key))
+                dbDict[key] = emp;
+        }
+        var grouped = _attendanceRows.Where(r => !string.IsNullOrWhiteSpace(r.Name)).GroupBy(r => r.Name.ToLower());
 
         foreach (var grp in grouped.OrderBy(g => g.Key))
         {
