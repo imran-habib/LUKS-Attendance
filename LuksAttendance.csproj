@@ -9,6 +9,7 @@
     <AssemblyName>LUKS-Attendance</AssemblyName>
     <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
     <Version>1.0.0</Version>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
