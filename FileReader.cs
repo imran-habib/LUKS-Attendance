@@ -1,10 +1,12 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Text;
 using ClosedXML.Excel;
+using ExcelDataReader;
 
 namespace LuksAttendance;
 
@@ -26,10 +28,67 @@ public static class FileReader
 {
     public static AttendanceData ReadAttendance(string path)
     {
-        if (Path.GetExtension(path).Equals(".xls", StringComparison.OrdinalIgnoreCase))
-            throw new NotSupportedException(
-                "Please save the file as .xlsx first.\nThe attendance software should have an export as .xlsx option.");
+        var ext = Path.GetExtension(path).ToLower();
+        if (ext == ".xls")
+            return ReadXls(path);
+        return ReadXlsx(path);
+    }
 
+    private static AttendanceData ReadXls(string path)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        using var stream = File.Open(path, FileMode.Open, FileAccess.Read);
+        using var reader = ExcelReaderFactory.CreateReader(stream);
+        var ds = reader.AsDataSet();
+        var table = ds.Tables[0];
+
+        var data = new AttendanceData();
+
+        // Row 1 (index 1): duration in col 2
+        if (table.Rows.Count > 1)
+            data.Duration = table.Rows[1][2]?.ToString() ?? "";
+
+        // Row 2 (index 2): day numbers starting col 2
+        if (table.Rows.Count > 2)
+        {
+            var dayRow = table.Rows[2];
+            for (int c = 2; c < table.Columns.Count; c++)
+            {
+                var val = dayRow[c]?.ToString()?.Replace(".0", "").Trim() ?? "";
+                if (int.TryParse(val, out int dayNum))
+                {
+                    var dayName = table.Rows.Count > 3 ? table.Rows[3][c]?.ToString()?.Trim() ?? "" : "";
+                    data.Days.Add((c, dayNum, dayName));
+                }
+            }
+        }
+
+        // Row 4+: employees
+        for (int r = 4; r < table.Rows.Count; r++)
+        {
+            var name = table.Rows[r][1]?.ToString()?.Trim() ?? "";
+            if (string.IsNullOrEmpty(name)) continue;
+
+            var emp = new EmployeeData
+            {
+                No = table.Rows[r][0]?.ToString()?.Replace(".0", "").Trim() ?? "",
+                Name = name
+            };
+
+            foreach (var (col, dayNum, _) in data.Days)
+            {
+                var cell = table.Rows[r][col]?.ToString()?.Trim() ?? "";
+                if (!string.IsNullOrEmpty(cell))
+                    emp.Punches[dayNum] = cell;
+            }
+            data.Employees.Add(emp);
+        }
+
+        return data;
+    }
+
+    private static AttendanceData ReadXlsx(string path)
+    {
         using var wb = new XLWorkbook(path);
         var ws = wb.Worksheets.First();
         var data = new AttendanceData();

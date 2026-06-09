@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -51,15 +50,17 @@ public partial class MainWindow : Window
             foreach (var rec in records)
                 _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
 
+            // Always calculate salary with available data
+            CalculateSalary();
+
             if (_issueRows.Count > 0)
             {
                 IssuesTab.IsSelected = true;
-                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_issueRows.Count} issues need resolution.";
+                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_issueRows.Count} issues to resolve. Salary calculated with available data.";
             }
             else
             {
-                CalculateSalary();
-                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_attendanceRows.Count} records processed.";
+                StatusText.Text = $"Loaded {_data.Employees.Count} employees. {_attendanceRows.Count} records. Salary ready.";
             }
 
             BtnExportExcel.IsEnabled = true;
@@ -110,8 +111,7 @@ public partial class MainWindow : Window
         };
         _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
         _issueRows.Remove(issue);
-
-        if (_issueRows.Count == 0) CalculateSalary();
+        CalculateSalary();
         StatusText.Text = $"Resolved. {_issueRows.Count} issues remaining.";
     }
 
@@ -119,7 +119,7 @@ public partial class MainWindow : Window
     {
         if (IssuesGrid.SelectedItem is not IssueRow issue) return;
         _issueRows.Remove(issue);
-        if (_issueRows.Count == 0) CalculateSalary();
+        CalculateSalary();
         StatusText.Text = $"Skipped. {_issueRows.Count} issues remaining.";
     }
 
@@ -138,7 +138,6 @@ public partial class MainWindow : Window
             var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0);
             _salaryRows.Add(sal);
         }
-        StatusText.Text = $"Salary calculated for {_salaryRows.Count} employees.";
     }
 
     private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
