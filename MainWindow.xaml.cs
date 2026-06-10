@@ -140,17 +140,8 @@ public partial class MainWindow : Window
         // Get employee names from DB for live search
         var names = _employeeDb.Select(emp => emp.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
 
-        // Get available days from existing attendance data (or generate from date range)
+        // Only use existing days if attendance data was actually loaded from file/device
         var days = _attendanceRows.Select(r => r.Day).Distinct().OrderBy(d => d).ToList();
-        if (days.Count == 0)
-        {
-            // No data loaded yet, use last 7 days
-            for (int i = 6; i >= 0; i--)
-            {
-                var dt = DateTime.Today.AddDays(-i);
-                days.Add(dt.ToString("dd-MMM (ddd)"));
-            }
-        }
 
         var dlg = new ManualEntryDialog(names, days) { Owner = this };
         dlg.ShowDialog();
