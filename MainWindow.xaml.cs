@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         EmployeeGrid.ItemsSource = _employeeDb;
         IssuesGrid.ItemsSource = _issueRows;
         LoadDefaultEmployeeDb();
+        _ = AutoUpdater.CheckForUpdateAsync();
     }
 
     private void BtnLoad_Click(object sender, RoutedEventArgs e)
