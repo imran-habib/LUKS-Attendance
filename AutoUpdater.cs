@@ -15,6 +15,19 @@ public static class AutoUpdater
     private const string RepoName = "LUKS-Attendance";
     private const string ArtifactName = "LUKS-Attendance";
 
+    private static string GetCurrentBuildSha()
+    {
+        // Read from embedded file generated at build time
+        try
+        {
+            var shaFile = System.IO.Path.Combine(AppContext.BaseDirectory, "build_sha.txt");
+            if (System.IO.File.Exists(shaFile))
+                return System.IO.File.ReadAllText(shaFile).Trim();
+        }
+        catch { }
+        return "";
+    }
+
     // Check GitHub Actions for latest successful build
     public static async Task CheckForUpdateAsync()
     {
@@ -38,16 +51,17 @@ public static class AutoUpdater
             var createdAt = latestRun.GetProperty("created_at").GetString() ?? "";
 
             // Check if this is newer than current version by comparing commit
-            // Store last known SHA in a local file
-            var lastCheckFile = System.IO.Path.Combine(
-                System.IO.Path.GetDirectoryName(Environment.ProcessPath) ?? ".",
-                ".last_update_sha");
+            var currentSha = GetCurrentBuildSha();
 
+            if (shortSha == currentSha) return; // Already on this build
+
+            // Also check the "skip" file
+            var lastCheckFile = System.IO.Path.Combine(AppContext.BaseDirectory, ".last_update_sha");
             string lastSha = "";
             if (System.IO.File.Exists(lastCheckFile))
                 lastSha = System.IO.File.ReadAllText(lastCheckFile).Trim();
 
-            if (shortSha == lastSha) return; // Already on latest
+            if (shortSha == lastSha) return; // Already dismissed this version
 
             // New version available
             var result = MessageBox.Show(
@@ -71,7 +85,8 @@ public static class AutoUpdater
                 });
 
                 // Save SHA so we don't prompt again
-                System.IO.File.WriteAllText(lastCheckFile, shortSha);
+                var lastCheckFile2 = System.IO.Path.Combine(AppContext.BaseDirectory, ".last_update_sha");
+                System.IO.File.WriteAllText(lastCheckFile2, shortSha);
 
                 MessageBox.Show(
                     $"Download started in your browser.\n\n" +
@@ -86,7 +101,8 @@ public static class AutoUpdater
             else
             {
                 // Save SHA to not prompt again for this version
-                System.IO.File.WriteAllText(lastCheckFile, shortSha);
+                var lastCheckFile3 = System.IO.Path.Combine(AppContext.BaseDirectory, ".last_update_sha");
+                System.IO.File.WriteAllText(lastCheckFile3, shortSha);
             }
         }
         catch

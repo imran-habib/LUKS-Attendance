@@ -14,11 +14,21 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Embed build SHA
+        run: |
+          $sha = "${{ github.sha }}".Substring(0,7)
+          Set-Content -Path "build_sha.txt" -Value $sha
+
       - name: Publish
         run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
+
+      - name: Copy SHA to publish
+        run: Copy-Item "build_sha.txt" "./publish/build_sha.txt"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: LUKS-Attendance
-          path: ./publish/LUKS-Attendance.exe
+          path: |
+            ./publish/LUKS-Attendance.exe
+            ./publish/build_sha.txt
