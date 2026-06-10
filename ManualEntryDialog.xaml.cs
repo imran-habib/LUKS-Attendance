@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -10,6 +11,7 @@ public partial class ManualEntryDialog : Window
 {
     private readonly List<string> _employeeNames;
     private readonly List<string> _availableDays;
+    private readonly bool _hasExistingDays;
 
     public string SelectedName { get; private set; } = "";
     public List<string> SelectedDays { get; private set; } = new();
@@ -22,13 +24,23 @@ public partial class ManualEntryDialog : Window
         InitializeComponent();
         _employeeNames = employeeNames;
         _availableDays = availableDays;
+        _hasExistingDays = availableDays.Count > 0;
 
-        // Populate days list
-        foreach (var day in _availableDays)
-            LstDates.Items.Add(day);
-
-        // Select all by default
-        LstDates.SelectAll();
+        if (_hasExistingDays)
+        {
+            // Show day list from loaded attendance
+            foreach (var day in _availableDays)
+                LstDates.Items.Add(day);
+            LstDates.SelectAll();
+            PnlDateRange.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            // Show date pickers for manual range
+            LstDates.Visibility = Visibility.Collapsed;
+            DpManualFrom.SelectedDate = DateTime.Today.AddDays(-6);
+            DpManualTo.SelectedDate = DateTime.Today;
+        }
     }
 
     private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e)
@@ -63,7 +75,9 @@ public partial class ManualEntryDialog : Window
     {
         if (LstSuggestions.SelectedItem is string name)
         {
+            TxtSearch.TextChanged -= TxtSearch_TextChanged; // prevent re-trigger
             TxtSearch.Text = name;
+            TxtSearch.TextChanged += TxtSearch_TextChanged;
             LstSuggestions.Visibility = Visibility.Collapsed;
         }
     }
@@ -77,7 +91,20 @@ public partial class ManualEntryDialog : Window
             return;
         }
 
-        SelectedDays = LstDates.SelectedItems.Cast<string>().ToList();
+        if (_hasExistingDays)
+        {
+            SelectedDays = LstDates.SelectedItems.Cast<string>().ToList();
+        }
+        else
+        {
+            // Generate days from date pickers
+            var from = DpManualFrom.SelectedDate ?? DateTime.Today.AddDays(-6);
+            var to = DpManualTo.SelectedDate ?? DateTime.Today;
+            SelectedDays = new List<string>();
+            for (var dt = from; dt <= to; dt = dt.AddDays(1))
+                SelectedDays.Add(dt.ToString("dd-MMM (ddd)"));
+        }
+
         if (SelectedDays.Count == 0)
         {
             MessageBox.Show("Please select at least one day.", "No Days Selected");
