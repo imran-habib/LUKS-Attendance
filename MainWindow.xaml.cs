@@ -192,14 +192,50 @@ public partial class MainWindow : Window
 
     private string GetDateSuffix()
     {
-        return _data?.Duration?.Replace("/", "-").Replace(" ~ ", "_to_").Replace(" + ", "_") ?? DateTime.Now.ToString("yyyy-MM-dd");
+        var range = GetActualDateRange();
+        return range.Replace("/", "-").Replace(" ~ ", "_to_").Replace(" ", "");
+    }
+
+    private string GetActualDateRange()
+    {
+        // Derive date range from actual attendance data
+        var days = _attendanceRows
+            .Select(r => r.Day)
+            .Where(d => !string.IsNullOrWhiteSpace(d))
+            .Distinct()
+            .ToList();
+
+        if (days.Count == 0)
+            return _data?.Duration ?? DateTime.Now.ToString("yyyy-MM-dd");
+
+        // Parse "dd-MMM (ddd)" format to get actual dates for sorting
+        var dates = new List<DateTime>();
+        foreach (var d in days)
+        {
+            var part = d.Split('(')[0].Trim(); // "30-May" or "01-Jun"
+            if (DateTime.TryParseExact(part, "dd-MMM", 
+                System.Globalization.CultureInfo.InvariantCulture, 
+                System.Globalization.DateTimeStyles.None, out var dt))
+            {
+                // Assume current year or from loaded data
+                dt = new DateTime(DateTime.Today.Year, dt.Month, dt.Day);
+                dates.Add(dt);
+            }
+        }
+
+        if (dates.Count == 0)
+            return _data?.Duration ?? DateTime.Now.ToString("yyyy-MM-dd");
+
+        var min = dates.Min();
+        var max = dates.Max();
+        return $"{min:dd-MMM-yyyy} to {max:dd-MMM-yyyy}";
     }
 
     private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SaveFileDialog { Filter = "Excel|*.xlsx", FileName = $"Salary_Sheet_{GetDateSuffix()}.xlsx" };
         if (dlg.ShowDialog() != true) return;
-        ExcelExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _employeeDb, _data?.Duration ?? "");
+        ExcelExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _employeeDb, GetActualDateRange());
         StatusText.Text = $"Excel exported: {dlg.FileName}";
     }
 
@@ -207,7 +243,7 @@ public partial class MainWindow : Window
     {
         var dlg = new SaveFileDialog { Filter = "PDF|*.pdf", FileName = $"Salary_Sheet_{GetDateSuffix()}.pdf" };
         if (dlg.ShowDialog() != true) return;
-        PdfExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, _data?.Duration ?? "");
+        PdfExporter.Export(dlg.FileName, _attendanceRows, _salaryRows, GetActualDateRange());
         StatusText.Text = $"PDF exported: {dlg.FileName}";
     }
 
