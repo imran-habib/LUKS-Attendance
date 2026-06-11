@@ -269,4 +269,51 @@ public static class FileReader
 
         return (db, carryOver);
     }
+
+    public static (List<SalaryRow> rows, string weekRange) ReadSalaryExport(string path)
+    {
+        var rows = new List<SalaryRow>();
+        string weekRange = "";
+
+        using var wb = new XLWorkbook(path);
+        if (!wb.Worksheets.TryGetWorksheet("Salary", out var ws))
+            return (rows, weekRange);
+
+        var header = ws.Cell(1, 1).GetString();
+        var dashIdx = header.IndexOf('\u2014');
+        if (dashIdx > 0)
+            weekRange = header[(dashIdx + 1)..].Trim();
+
+        int lastRow = ws.LastRowUsed()?.RowNumber() ?? 3;
+        for (int r = 4; r <= lastRow; r++)
+        {
+            var name = ws.Cell(r, 2).GetString().Trim();
+            if (string.IsNullOrEmpty(name) || name == "TOTAL") continue;
+            if (name.StartsWith("\u2500\u2500")) continue;
+
+            var cat = ws.Cell(r, 1).GetString().Trim();
+            if (cat.StartsWith("\u2500\u2500")) cat = "";
+
+            int days = (int)ws.Cell(r, 3).GetDouble();
+            if (days == 0 && string.IsNullOrEmpty(ws.Cell(r, 3).GetString().Trim())) continue;
+
+            rows.Add(new SalaryRow
+            {
+                Category = cat,
+                Name = name,
+                Days = days,
+                OtHours = ws.Cell(r, 4).GetDouble(),
+                DedHours = ws.Cell(r, 5).GetDouble(),
+                NetHours = ws.Cell(r, 6).GetDouble(),
+                DailyRate = (int)ws.Cell(r, 7).GetDouble(),
+                HourlyRate = ws.Cell(r, 8).GetDouble(),
+                ExtraHrs = ws.Cell(r, 9).GetDouble(),
+                Advance = (decimal)ws.Cell(r, 10).GetDouble(),
+                Arrears = (decimal)ws.Cell(r, 11).GetDouble(),
+                NetSalary = (decimal)ws.Cell(r, 12).GetDouble()
+            });
+        }
+
+        return (rows, weekRange);
+    }
 }

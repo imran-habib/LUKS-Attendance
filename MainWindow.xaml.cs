@@ -138,10 +138,7 @@ public partial class MainWindow : Window
 
     private void BtnAddManualAttendance_Click(object sender, RoutedEventArgs e)
     {
-        // Get employee names from DB for live search
         var names = _employeeDb.Select(emp => emp.Name).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
-
-        // Only use existing days if attendance data was actually loaded from file/device
         var days = _attendanceRows.Select(r => r.Day).Distinct().OrderBy(d => d).ToList();
 
         var dlg = new ManualEntryDialog(names, days) { Owner = this };
@@ -149,7 +146,6 @@ public partial class MainWindow : Window
 
         if (!dlg.Confirmed) return;
 
-        // Add attendance rows for all selected days
         foreach (var day in dlg.SelectedDays)
         {
             var rec = new PunchRecord
@@ -170,7 +166,6 @@ public partial class MainWindow : Window
     private void CalculateSalary()
     {
         _salaryRows.Clear();
-        // Use first occurrence if duplicate names exist
         var dbDict = new Dictionary<string, EmployeeEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var emp in _employeeDb)
         {
@@ -189,6 +184,57 @@ public partial class MainWindow : Window
             var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
             _salaryRows.Add(sal);
         }
+        AutoSaveToDb();
+    }
+
+    private void AutoSaveToDb()
+    {
+        try
+        {
+            if (_salaryRows.Count == 0) return;
+            var range = GetActualDateRange();
+            var parts = range.Split(" to ");
+            string weekStart = parts.Length > 0 ? parts[0].Trim() : range;
+            string weekEnd = parts.Length > 1 ? parts[1].Trim() : weekStart;
+            DatabaseService.SaveWeek(weekStart, weekEnd, _salaryRows);
+        }
+        catch { }
+    }
+
+    private void BtnBatchImport_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Filter = "Excel Files|*.xlsx",
+            Title = "Select old salary export files to import into DB",
+            Multiselect = true
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        int imported = 0;
+        foreach (var file in dlg.FileNames)
+        {
+            try
+            {
+                var (rows, weekRange) = FileReader.ReadSalaryExport(file);
+                if (rows.Count > 0 && !string.IsNullOrEmpty(weekRange))
+                {
+                    var parts = weekRange.Split(" to ");
+                    string ws = parts.Length > 0 ? parts[0].Trim() : weekRange;
+                    string we = parts.Length > 1 ? parts[1].Trim() : ws;
+                    DatabaseService.SaveWeek(ws, we, rows);
+                    imported++;
+                }
+            }
+            catch { }
+        }
+        StatusText.Text = $"Batch import: {imported}/{dlg.FileNames.Length} files imported to database.";
+    }
+
+    private void BtnChangeDbLocation_Click(object sender, RoutedEventArgs e)
+    {
+        App.PromptDbLocation();
+        StatusText.Text = $"Database location: {DatabaseService.DbPath}";
     }
 
     private string GetDateSuffix()
@@ -199,7 +245,6 @@ public partial class MainWindow : Window
 
     private string GetActualDateRange()
     {
-        // Derive date range from actual attendance data
         var days = _attendanceRows
             .Select(r => r.Day)
             .Where(d => !string.IsNullOrWhiteSpace(d))
@@ -209,16 +254,14 @@ public partial class MainWindow : Window
         if (days.Count == 0)
             return _data?.Duration ?? DateTime.Now.ToString("yyyy-MM-dd");
 
-        // Parse "dd-MMM (ddd)" format to get actual dates for sorting
         var dates = new List<DateTime>();
         foreach (var d in days)
         {
-            var part = d.Split('(')[0].Trim(); // "30-May" or "01-Jun"
-            if (DateTime.TryParseExact(part, "dd-MMM", 
-                System.Globalization.CultureInfo.InvariantCulture, 
+            var part = d.Split('(')[0].Trim();
+            if (DateTime.TryParseExact(part, "dd-MMM",
+                System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var dt))
             {
-                // Assume current year or from loaded data
                 dt = new DateTime(DateTime.Today.Year, dt.Month, dt.Day);
                 dates.Add(dt);
             }
@@ -261,7 +304,6 @@ public partial class MainWindow : Window
         var ip = TxtDeviceIp.Text.Trim();
         int port = int.TryParse(TxtDevicePort.Text.Trim(), out int p) ? p : 5005;
 
-        // If already connected, disconnect
         if (_device != null)
         {
             _device.Disconnect();
@@ -299,7 +341,6 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // Connected — fetch user list for name mapping
             TxtDeviceStatus.Text = "✅ Connected! Fetching user list...";
             _deviceUsers = _device.GetUsers();
 
@@ -307,7 +348,6 @@ public partial class MainWindow : Window
             BtnDeviceConnect.Background = System.Windows.Media.Brushes.LightGreen;
             PnlDeviceImport.Visibility = Visibility.Visible;
 
-            // Default date range: last 7 days
             DpTo.SelectedDate = DateTime.Today;
             DpFrom.SelectedDate = DateTime.Today.AddDays(-6);
 
@@ -338,11 +378,8 @@ public partial class MainWindow : Window
         try
         {
             var allLogs = _device.GetAttendanceLogs();
-
-            // Filter by date range
             var filtered = allLogs.Where(l => l.Timestamp.Date >= fromDate.Date && l.Timestamp.Date <= toDate.Date).ToList();
 
-            // Map UserID to Name
             foreach (var log in filtered)
             {
                 if (_deviceUsers.TryGetValue(log.UserId, out var name))
@@ -357,12 +394,12 @@ public partial class MainWindow : Window
             if (filtered.Count > 0)
             {
                 int employees = filtered.Select(l => l.UserId).Distinct().Count();
-                int days = filtered.Select(l => l.Timestamp.Date).Distinct().Count();
+                int days2 = filtered.Select(l => l.Timestamp.Date).Distinct().Count();
                 MessageBox.Show(
                     $"✅ Import successful!\n\n" +
                     $"• Records: {filtered.Count}\n" +
                     $"• Employees: {employees}\n" +
-                    $"• Days: {days}\n" +
+                    $"• Days: {days2}\n" +
                     $"• Period: {fromDate:dd-MMM-yyyy} to {toDate:dd-MMM-yyyy}\n\n" +
                     "Data is shown in the grid. You can now review it.",
                     "Import Successful", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -452,6 +489,9 @@ IMPORTANT NOTES:
 
 • '📁 Load Previous' loads last week's salary file
   to carry over the Employee DB rates.
+
+• '📈 Analytics' tab shows trends and forecasting
+  from saved salary history.
 ═══════════════════════════════════════════";
 
         MessageBox.Show(help, "Help - How to Use", MessageBoxButton.OK, MessageBoxImage.Information);
