@@ -17,15 +17,14 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        // Load or prompt for DB location
-        if (!DatabaseService.LoadSettings())
-            PromptDbLocation();
+        // Try to load existing DB settings silently
+        DatabaseService.LoadSettings();
     }
 
     public static void PromptDbLocation()
     {
         var result = MessageBox.Show(
-            "LUKS Salary Software now saves history for analytics & forecasting.\n\n" +
+            "LUKS Salary Software saves history for analytics & forecasting.\n\n" +
             "Select a folder to store the salary database.\n" +
             "(Tip: use a backed-up folder like OneDrive or USB)\n\n" +
             "Click OK to choose a folder, or Cancel to use the app folder.",

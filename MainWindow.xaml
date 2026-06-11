@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:LuksAttendance"
-        Title="LUKS Salary Software v3.0.1 | Built by Imran Habib | Property of LUKS INTERIORS" Height="750" Width="1150"
+        Title="LUKS Salary Software v3.0.2 | Built by Imran Habib | Property of LUKS INTERIORS" Height="750" Width="1150"
         WindowStartupLocation="CenterScreen"
         Icon="Assets/logo.png">
     <Grid>
@@ -18,7 +18,7 @@
             <Grid>
                 <Image Source="assets/logo_transparent.png" Height="28" HorizontalAlignment="Left" Margin="10,0,0,0"/>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="SALARY SOFTWARE - v3.0.1" FontSize="24" FontWeight="Bold"
+                    <TextBlock Text="SALARY SOFTWARE - v3.0.2" FontSize="24" FontWeight="Bold"
                                Foreground="White" HorizontalAlignment="Center"/>
                     <TextBlock Text="Built by Imran Habib — Property of LUKS INTERIORS"
                                FontSize="9" Foreground="#AAB8D2" HorizontalAlignment="Center"/>

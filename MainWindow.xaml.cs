@@ -192,6 +192,11 @@ public partial class MainWindow : Window
         try
         {
             if (_salaryRows.Count == 0) return;
+            if (!DatabaseService.IsConfigured)
+            {
+                App.PromptDbLocation();
+                if (!DatabaseService.IsConfigured) return;
+            }
             var range = GetActualDateRange();
             var parts = range.Split(" to ");
             string weekStart = parts.Length > 0 ? parts[0].Trim() : range;
@@ -200,6 +205,7 @@ public partial class MainWindow : Window
         }
         catch { }
     }
+
 
     private void BtnBatchImport_Click(object sender, RoutedEventArgs e)
     {

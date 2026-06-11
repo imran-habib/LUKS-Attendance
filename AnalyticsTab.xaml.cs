@@ -16,7 +16,7 @@ public partial class AnalyticsTab : UserControl
     public AnalyticsTab()
     {
         InitializeComponent();
-        Loaded += (_, _) => LoadCharts();
+        Loaded += (_, _) => { try { LoadCharts(); } catch { } };
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => LoadCharts();
