@@ -95,7 +95,7 @@ public partial class AnalyticsTab : UserControl
         for (int i = 0; i < names.Count; i++)
         {
             var name = names[i];
-            var workerData = otData.Where(d => d.Name == name).ToDictionary(d => d.WeekStart, d => d.OtHours);
+            var workerData = otData.Where(d => d.Name == name).GroupBy(d => d.WeekStart).ToDictionary(g => g.Key, g => g.Last().OtHours);
             var values = weeks.Select(w => workerData.GetValueOrDefault(w, 0.0)).ToArray();
 
             series.Add(new LineSeries<double>
