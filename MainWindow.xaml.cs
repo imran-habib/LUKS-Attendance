@@ -51,11 +51,32 @@ public partial class MainWindow : Window
             _attendanceRows.Clear();
             _issueRows.Clear();
 
+            // Build lookup of employee types
+            var empTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var emp in _employeeDb)
+                if (!string.IsNullOrWhiteSpace(emp.Name))
+                    empTypes[emp.Name.ToLower()] = emp.Type;
+
             foreach (var issue in issues)
+            {
+                if (empTypes.TryGetValue(issue.Name.ToLower(), out var iType) && iType == "excluded")
+                    continue;
+                // Monthly employees: single punch = present, not an issue
+                if (empTypes.TryGetValue(issue.Name.ToLower(), out var mType2) && mType2 == "monthly")
+                {
+                    var pRec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = issue.InTime, Status = "present" };
+                    _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(pRec));
+                    continue;
+                }
                 _issueRows.Add(issue);
+            }
 
             foreach (var rec in records)
+            {
+                if (empTypes.TryGetValue(rec.Name.ToLower(), out var rType) && rType == "excluded")
+                    continue;
                 _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            }
 
             CalculateSalary();
             BtnRecalc.IsEnabled = true;
@@ -100,7 +121,8 @@ public partial class MainWindow : Window
 
     private void BtnResolve_Click(object sender, RoutedEventArgs e)
     {
-        if (IssuesGrid.SelectedItem is not IssueRow issue) return;
+        var selected = IssuesGrid.SelectedItems.Cast<IssueRow>().ToList();
+        if (selected.Count == 0) return;
         var time = TxtResolveTime.Text.Trim();
         if (string.IsNullOrEmpty(time)) time = "17:00";
 
@@ -110,24 +132,29 @@ public partial class MainWindow : Window
             return;
         }
 
-        var rec = new PunchRecord
+        foreach (var issue in selected)
         {
-            Name = issue.Name, DayLabel = issue.DayLabel,
-            InTime = issue.InTime, OutTime = time,
-            Status = "hr_entered"
-        };
-        _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
-        _issueRows.Remove(issue);
+            var rec = new PunchRecord
+            {
+                Name = issue.Name, DayLabel = issue.DayLabel,
+                InTime = issue.InTime, OutTime = time,
+                Status = "hr_entered"
+            };
+            _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            _issueRows.Remove(issue);
+        }
         CalculateSalary();
-        StatusText.Text = $"Resolved. {_issueRows.Count} issues remaining.";
+        StatusText.Text = $"Resolved {selected.Count}. {_issueRows.Count} issues remaining.";
     }
 
     private void BtnSkip_Click(object sender, RoutedEventArgs e)
     {
-        if (IssuesGrid.SelectedItem is not IssueRow issue) return;
-        _issueRows.Remove(issue);
+        var selected = IssuesGrid.SelectedItems.Cast<IssueRow>().ToList();
+        if (selected.Count == 0) return;
+        foreach (var issue in selected)
+            _issueRows.Remove(issue);
         CalculateSalary();
-        StatusText.Text = $"Skipped. {_issueRows.Count} issues remaining.";
+        StatusText.Text = $"Skipped {selected.Count}. {_issueRows.Count} issues remaining.";
     }
 
     private void BtnRecalc_Click(object sender, RoutedEventArgs e)
@@ -179,7 +206,7 @@ public partial class MainWindow : Window
         {
             if (!dbDict.TryGetValue(grp.Key, out var entry)) continue;
             if (entry.Type == "excluded") continue;
-            if (entry.Type == "monthly") continue;
+            if (entry.Type != (BtnMonthly.IsChecked == true ? "monthly" : "weekly")) continue;
 
             var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
             _salaryRows.Add(sal);
@@ -304,6 +331,7 @@ public partial class MainWindow : Window
 
     private ZkDevice? _device;
     private Dictionary<string, string> _deviceUsers = new();
+    private List<AttendanceLog> _deviceLogs = new();
 
     private async void BtnDeviceConnect_Click(object sender, RoutedEventArgs e)
     {
@@ -331,17 +359,13 @@ public partial class MainWindow : Window
 
             if (!connected)
             {
+                var diagLog = string.Join("\n", _device.DiagLog);
                 _device = null;
                 BtnDeviceConnect.Background = System.Windows.Media.Brushes.IndianRed;
                 BtnDeviceConnect.Content = "🔌 Connect (Failed)";
-                TxtDeviceStatus.Text = "❌ Connection failed.";
+                TxtDeviceStatus.Text = "❌ Connection failed. See details.";
                 MessageBox.Show(
-                    $"Could not connect to device at {ip}:{port}\n\n" +
-                    "Please check:\n" +
-                    "• Is the attendance machine turned on?\n" +
-                    "• Is this PC on the same network (192.168.1.x)?\n" +
-                    "• Is the IP and Port correct?\n" +
-                    "• Is the Ethernet cable connected to the machine?",
+                    $"Could not connect to device at {ip}:{port}\n\nDiagnostic Log:\n" + diagLog,
                     "Connection Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 BtnDeviceConnect.IsEnabled = true;
                 return;
@@ -394,7 +418,9 @@ public partial class MainWindow : Window
                     log.UserName = $"Unknown ({log.UserId})";
             }
 
+            _deviceLogs = filtered;
             DeviceLogsGrid.ItemsSource = filtered;
+            BtnDeviceToSalary.IsEnabled = filtered.Count > 0;
             TxtDeviceStatus.Text = $"✅ Imported {filtered.Count} records ({fromDate:dd-MMM} to {toDate:dd-MMM}). Total on device: {allLogs.Count}";
 
             if (filtered.Count > 0)
@@ -422,6 +448,127 @@ public partial class MainWindow : Window
         {
             TxtDeviceStatus.Text = $"❌ Error fetching: {ex.Message}";
             MessageBox.Show($"Error fetching logs:\n\n{ex.Message}", "Fetch Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+
+    private void BtnDeviceToSalary_Click(object sender, RoutedEventArgs e)
+    {
+        if (_deviceLogs.Count == 0)
+        {
+            MessageBox.Show("No imported data. Import from device first.", "No Data");
+            return;
+        }
+
+        // Group logs by user+date, pair first and last punch as IN/OUT
+        var grouped = _deviceLogs
+            .GroupBy(l => new { l.UserName, Date = l.Timestamp.Date })
+            .OrderBy(g => g.Key.Date)
+            .ThenBy(g => g.Key.UserName);
+
+        _attendanceRows.Clear();
+        _issueRows.Clear();
+
+        string[] dayNames = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
+        foreach (var grp in grouped)
+        {
+            var punches = grp.OrderBy(l => l.Timestamp).ToList();
+            string dayLabel = $"{grp.Key.Date:dd-MMM} ({dayNames[(int)grp.Key.Date.DayOfWeek]})";
+            string name = grp.Key.UserName;
+            string inTime = punches.First().Timestamp.ToString("HH:mm");
+
+            if (punches.Count >= 2)
+            {
+                string outTime = punches.Last().Timestamp.ToString("HH:mm");
+                var rec = new PunchRecord { Name = name, DayLabel = dayLabel, InTime = inTime, OutTime = outTime, Status = "device" };
+                _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            }
+            else
+            {
+                _issueRows.Add(new IssueRow { Name = name, DayLabel = dayLabel, Type = "Missing OUT", InTime = inTime, OutTime = "?" });
+            }
+        }
+
+        CalculateSalary();
+        BtnRecalc.IsEnabled = true;
+        BtnExportExcel.IsEnabled = true;
+        BtnExportPdf.IsEnabled = true;
+        BtnPrint.IsEnabled = true;
+
+        if (_issueRows.Count > 0)
+            IssuesTab.IsSelected = true;
+        else
+            MainTabs.SelectedIndex = 1; // Salary tab
+
+        StatusText.Text = $"Device → Salary: {_attendanceRows.Count} records, {_salaryRows.Count} employees calculated. {_issueRows.Count} issues.";
+    }
+
+    private void BtnPeriodToggle_Click(object sender, RoutedEventArgs e)
+    {
+        // Toggle mutual exclusion
+        if (sender == BtnWeekly)
+        {
+            BtnWeekly.IsChecked = true;
+            BtnMonthly.IsChecked = false;
+            BtnWeekly.Background = System.Windows.Media.Brushes.LightGreen;
+            BtnWeekly.FontWeight = FontWeights.Bold;
+            BtnMonthly.Background = System.Windows.Media.Brushes.LightGray;
+            BtnMonthly.FontWeight = FontWeights.Normal;
+        }
+        else
+        {
+            BtnMonthly.IsChecked = true;
+            BtnWeekly.IsChecked = false;
+            BtnMonthly.Background = System.Windows.Media.Brushes.LightGreen;
+            BtnMonthly.FontWeight = FontWeights.Bold;
+            BtnWeekly.Background = System.Windows.Media.Brushes.LightGray;
+            BtnWeekly.FontWeight = FontWeights.Normal;
+        }
+
+        if (_data == null || _attendanceRows == null) return;
+        // Reload with new filter
+        var (records, issues) = PunchParser.Parse(_data);
+        _attendanceRows.Clear();
+        _issueRows.Clear();
+
+        var empTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var emp in _employeeDb)
+            if (!string.IsNullOrWhiteSpace(emp.Name))
+                empTypes[emp.Name.ToLower()] = emp.Type;
+
+        foreach (var issue in issues)
+        {
+            if (empTypes.TryGetValue(issue.Name.ToLower(), out var iType) && iType == "excluded")
+                continue;
+            // Monthly employees: single punch = present, not an issue
+            if (empTypes.TryGetValue(issue.Name.ToLower(), out var mType2) && mType2 == "monthly")
+            {
+                var pRec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = issue.InTime, Status = "present" };
+                _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(pRec));
+                continue;
+            }
+            _issueRows.Add(issue);
+        }
+
+        foreach (var rec in records)
+        {
+            if (empTypes.TryGetValue(rec.Name.ToLower(), out var rType) && rType == "excluded")
+                continue;
+            _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+        }
+
+        CalculateSalary();
+        StatusText.Text = $"Showing {(BtnMonthly.IsChecked == true ? "monthly" : "weekly")} employees: {_attendanceRows.Count} records, {_salaryRows.Count} in salary.";
+    }
+
+    private void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new AddEmployeeDialog() { Owner = this };
+        dlg.ShowDialog();
+        if (dlg.Confirmed)
+        {
+            _employeeDb.Add(dlg.NewEmployee);
+            StatusText.Text = $"Added employee: {dlg.NewEmployee.Name} (Rs {dlg.NewEmployee.DailyRate}/day, {dlg.NewEmployee.Category})";
         }
     }
 
