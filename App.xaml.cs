@@ -17,6 +17,15 @@ public partial class App : Application
             args.Handled = true;
         };
 
+        // Show login
+        var login = new LoginWindow();
+        login.ShowDialog();
+        if (!login.Authenticated)
+        {
+            Shutdown();
+            return;
+        }
+
         // Try to load existing DB settings silently
         DatabaseService.LoadSettings();
     }

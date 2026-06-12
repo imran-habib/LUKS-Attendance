@@ -48,8 +48,6 @@ public static class PdfExporter
                         cols.ConstantColumn(35);  // OT
                         cols.ConstantColumn(45);  // Deduction
                         cols.ConstantColumn(40);  // Net Hrs
-                        cols.ConstantColumn(45);  // Daily Rs
-                        cols.ConstantColumn(38);  // Hr Rs
                         cols.ConstantColumn(50);  // Advance
                         cols.ConstantColumn(45);  // Arrears
                         cols.ConstantColumn(60);  // Net Salary
@@ -63,8 +61,6 @@ public static class PdfExporter
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("OT").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Deduction").Bold().FontSize(7).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Net Hrs").Bold().FontSize(8).FontColor(Colors.White);
-                        h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Daily Rs").Bold().FontSize(8).FontColor(Colors.White);
-                        h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Hr Rs").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Advance").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Arrears").Bold().FontSize(8).FontColor(Colors.White);
                         h.Cell().Border(0.5f).Background("#1a237e").Padding(3).Text("Net Salary").Bold().FontSize(8).FontColor(Colors.White);
@@ -79,15 +75,13 @@ public static class PdfExporter
                         table.Cell().Border(0.5f).Padding(3).Text(r.OtHours.ToString("F1")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.DedHours.ToString("F1")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.NetHours.ToString("F1")).FontSize(8);
-                        table.Cell().Border(0.5f).Padding(3).Text(r.DailyRate.ToString()).FontSize(8);
-                        table.Cell().Border(0.5f).Padding(3).Text(r.HourlyRate.ToString("F0")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.Advance.ToString("F0")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.Arrears.ToString("F0")).FontSize(8);
                         table.Cell().Border(0.5f).Padding(3).Text(r.NetSalary.ToString("N0")).FontSize(8).Bold();
                     }
 
                     // Total
-                    for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < 8; i++)
                         table.Cell().Border(0.5f).Padding(3).Text(i == 1 ? "TOTAL" : "").Bold().FontSize(8);
                     table.Cell().Border(0.5f).Padding(3)
                         .Text(salary.Sum(s => s.NetSalary).ToString("N0")).Bold().FontSize(9);

@@ -13,13 +13,19 @@ public class PunchRecord
     public string Status { get; set; } = "ok";
 }
 
-public class IssueRow
+public class IssueRow : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     public string Name { get; set; } = "";
     public string DayLabel { get; set; } = "";
     public string Type { get; set; } = "";
     public string InTime { get; set; } = "";
-    public string OutTime { get; set; } = ""; // was "Raw", now shows expected OUT time needed
+    private string _outTime = "";
+    public string OutTime
+    {
+        get => _outTime;
+        set { _outTime = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(OutTime))); }
+    }
 }
 
 public static class PunchParser

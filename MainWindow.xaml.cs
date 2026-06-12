@@ -119,33 +119,7 @@ public partial class MainWindow : Window
         StatusText.Text = $"Loaded previous data: {db.Count} employees.";
     }
 
-    private void BtnResolve_Click(object sender, RoutedEventArgs e)
-    {
-        var selected = IssuesGrid.SelectedItems.Cast<IssueRow>().ToList();
-        if (selected.Count == 0) return;
-        var time = TxtResolveTime.Text.Trim();
-        if (string.IsNullOrEmpty(time)) time = "17:00";
 
-        if (!TimeHelper.IsValidTime(time))
-        {
-            MessageBox.Show("Invalid time format. Use HH:MM", "Error");
-            return;
-        }
-
-        foreach (var issue in selected)
-        {
-            var rec = new PunchRecord
-            {
-                Name = issue.Name, DayLabel = issue.DayLabel,
-                InTime = issue.InTime, OutTime = time,
-                Status = "hr_entered"
-            };
-            _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
-            _issueRows.Remove(issue);
-        }
-        CalculateSalary();
-        StatusText.Text = $"Resolved {selected.Count}. {_issueRows.Count} issues remaining.";
-    }
 
     private void BtnSkip_Click(object sender, RoutedEventArgs e)
     {
@@ -559,6 +533,57 @@ public partial class MainWindow : Window
 
         CalculateSalary();
         StatusText.Text = $"Showing {(BtnMonthly.IsChecked == true ? "monthly" : "weekly")} employees: {_attendanceRows.Count} records, {_salaryRows.Count} in salary.";
+    }
+
+    private void BtnAutoResolve_Click(object sender, RoutedEventArgs e)
+    {
+        if (_issueRows.Count == 0) return;
+
+        int filled = 0;
+        foreach (var issue in _issueRows)
+        {
+            if (string.IsNullOrEmpty(issue.InTime) || !TimeHelper.IsValidTime(issue.InTime))
+                continue;
+
+            var inParts = issue.InTime.Split(':');
+            int h = int.Parse(inParts[0]) + 9;
+            int m = int.Parse(inParts[1]);
+            if (h >= 24) h -= 24;
+            issue.OutTime = $"{h:D2}:{m:D2}";
+            filled++;
+        }
+        StatusText.Text = $"Pre-filled {filled} OUT times (IN + 9h). Edit any that need fixing, then click Resolve All.";
+    }
+
+    private void BtnResolveAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (_issueRows.Count == 0) return;
+
+        var result = MessageBox.Show(
+            $"Resolve all {_issueRows.Count} issues with the OUT times shown?\n\nMake sure you have reviewed and fixed any incorrect times.",
+            "Confirm Resolve All", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (result != MessageBoxResult.Yes) return;
+
+        int resolved = 0;
+        var toResolve = _issueRows.ToList();
+        foreach (var issue in toResolve)
+        {
+            string outTime = issue.OutTime?.Trim() ?? "";
+            if (!TimeHelper.IsValidTime(outTime)) continue;
+
+            var rec = new PunchRecord
+            {
+                Name = issue.Name, DayLabel = issue.DayLabel,
+                InTime = issue.InTime, OutTime = outTime,
+                Status = "hr_resolved"
+            };
+            _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            _issueRows.Remove(issue);
+            resolved++;
+        }
+        CalculateSalary();
+        StatusText.Text = $"Resolved {resolved} issues. {_issueRows.Count} remaining (invalid times skipped).";
     }
 
     private void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
