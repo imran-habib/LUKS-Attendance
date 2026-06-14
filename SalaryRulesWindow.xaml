@@ -1,0 +1,52 @@
+<Window x:Class="LuksAttendance.SalaryRulesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Salary Rules" Height="480" Width="520"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Icon="Assets/logo.png">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="📐 Salary Calculation Rules" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="⏱ Working Hours" FontSize="14" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
+                    Text="• Standard workday = 8 hours&#x0a;• 1 hour lunch is deducted ONLY if OUT is after 1:00 PM&#x0a;• If OUT before 1:00 PM → no lunch deducted (half-day counted as-is)"/>
+
+                <TextBlock Text="⏲ Time Rounding" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
+                    Text="• All hours are rounded to the nearest 15 minutes&#x0a;• Example: 7h 52m → 8h 00m | 7h 37m → 7h 30m"/>
+
+                <TextBlock Text="📈 Overtime &amp; Deductions" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
+                    Text="• Overtime (OT) = hours worked BEYOND 8 in a day&#x0a;• Deduction = hours SHORT of 8 in a day&#x0a;• Net Hours = Total OT − Total Deductions for the period"/>
+
+                <TextBlock Text="💰 Rate Calculation" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
+                    Text="• Hourly Rate = Daily Rate ÷ 8&#x0a;• Each employee has a fixed Daily Rate set in Employee DB"/>
+
+                <TextBlock Text="🧮 Net Salary Formula" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <Border Background="#F0F4FF" Padding="12" CornerRadius="4" Margin="10,0,0,10">
+                    <TextBlock TextWrapping="Wrap" FontSize="13" FontFamily="Consolas"
+                        Text="Net Salary = (Days × Daily Rate)&#x0a;           + (Net Hours × Hourly Rate)&#x0a;           − Advance&#x0a;           + Arrears"/>
+                </Border>
+
+                <TextBlock Text="👥 Employee Types" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
+                    Text="• Weekly — paid based on actual days/hours worked&#x0a;• Monthly — fixed salary, only presence is tracked&#x0a;• Excluded — owners/managers, hidden from calculations"/>
+
+                <TextBlock Text="📋 Examples" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
+                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,15"
+                    Text="• Worker at Rs.1500/day works 6 days, 2h OT total:&#x0a;   = (6 × 1500) + (2 × 187.5) = Rs.9,375&#x0a;&#x0a;• Worker at Rs.1500/day works 6 days, 1h deduction:&#x0a;   = (6 × 1500) + (−1 × 187.5) = Rs.8,812"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Button Grid.Row="2" Content="Close" Click="BtnClose_Click" Padding="14,8" FontSize="14" HorizontalAlignment="Right" Margin="0,15,0,0"/>
+    </Grid>
+</Window>

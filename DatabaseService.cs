@@ -205,6 +205,51 @@ public static class DatabaseService
         return results;
     }
 
+
+    public static List<SalaryRow> GetPeriodRecords(string weekStart, string weekEnd)
+    {
+        var results = new List<SalaryRow>();
+        if (!IsConfigured) return results;
+        using var conn = Open();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Name,Category,Days,OtHours,DedHours,NetHours,DailyRate,HourlyRate,ExtraHrs,Advance,Arrears,NetSalary FROM SalaryRecord WHERE WeekStart=@s AND WeekEnd=@e ORDER BY Category,Name";
+        cmd.Parameters.AddWithValue("@s", weekStart);
+        cmd.Parameters.AddWithValue("@e", weekEnd);
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            results.Add(new SalaryRow
+            {
+                Name = r.GetString(0), Category = r.GetString(1),
+                Days = r.GetInt32(2), OtHours = r.GetDouble(3),
+                DedHours = r.GetDouble(4), NetHours = r.GetDouble(5),
+                DailyRate = r.GetInt32(6), HourlyRate = r.GetDouble(7),
+                ExtraHrs = r.GetDouble(8), Advance = (decimal)r.GetDouble(9),
+                Arrears = (decimal)r.GetDouble(10), NetSalary = (decimal)r.GetDouble(11)
+            });
+        }
+        return results;
+    }
+
+    public static Dictionary<string, double> GetEmployeeAverages(int lastN = 4)
+    {
+        var results = new Dictionary<string, double>(System.StringComparer.OrdinalIgnoreCase);
+        if (!IsConfigured) return results;
+        using var conn = Open();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT Name, AVG(NetSalary) FROM (SELECT Name, NetSalary, WeekStart, ROW_NUMBER() OVER (PARTITION BY Name ORDER BY WeekStart DESC) as rn FROM SalaryRecord) WHERE rn <= {lastN} GROUP BY Name";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            var name = r.GetString(0);
+            var avg = r.GetDouble(1);
+            if (!string.IsNullOrEmpty(name) && avg > 0)
+                results[name] = avg;
+        }
+        return results;
+    }
     public static int GetRecordCount()
     {
         if (!IsConfigured) return 0;

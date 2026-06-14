@@ -34,6 +34,7 @@ public class SalaryRow : INotifyPropertyChanged
     }
 
     public string Category { get; set; } = "";
+    public string StatusIndicator { get; set; } = "⚪";
     public string Name { get; set; } = "";
     public int Days { get; set; }
     public double OtHours { get; set; }

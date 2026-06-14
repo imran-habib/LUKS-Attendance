@@ -17,6 +17,9 @@ public partial class App : Application
             args.Handled = true;
         };
 
+        // Prevent shutdown when login window closes
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         // Show login
         var login = new LoginWindow();
         login.ShowDialog();
@@ -28,6 +31,12 @@ public partial class App : Application
 
         // Try to load existing DB settings silently
         DatabaseService.LoadSettings();
+
+        // Show main window, shutdown when it closes
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+        var main = new MainWindow();
+        MainWindow = main;
+        main.Show();
     }
 
     public static void PromptDbLocation()

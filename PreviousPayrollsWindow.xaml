@@ -1,0 +1,34 @@
+<Window x:Class="LuksAttendance.PreviousPayrollsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Previous Payrolls" Height="450" Width="700"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Icon="Assets/logo.png">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="📁 Saved Payroll History" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+
+        <DataGrid x:Name="PayrollGrid" Grid.Row="1" IsReadOnly="True" AutoGenerateColumns="False"
+                  SelectionMode="Single" FontSize="13">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Period Start" Binding="{Binding WeekStart}" Width="130"/>
+                <DataGridTextColumn Header="Period End" Binding="{Binding WeekEnd}" Width="130"/>
+                <DataGridTextColumn Header="Employees" Binding="{Binding TotalEmployees}" Width="80"/>
+                <DataGridTextColumn Header="Total Payout" Binding="{Binding TotalPayoutFormatted}" Width="120"/>
+                <DataGridTextColumn Header="OT Hours" Binding="{Binding TotalOtHoursFormatted}" Width="80"/>
+                <DataGridTextColumn Header="Deductions" Binding="{Binding TotalDedHoursFormatted}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <TextBlock x:Name="TxtInfo" VerticalAlignment="Center" FontSize="12" Foreground="Gray" Margin="0,0,15,0"/>
+            <Button Content="View Details" Click="BtnViewDetails_Click" Padding="12,6" FontSize="13" Margin="0,0,8,0"/>
+            <Button Content="Close" Click="BtnClose_Click" Padding="12,6" FontSize="13"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -29,6 +29,28 @@ public partial class MainWindow : Window
         _ = AutoUpdater.CheckForUpdateAsync();
     }
 
+    private void BtnRunPayroll_Click(object sender, RoutedEventArgs e)
+    {
+        var wizard = new PayrollWizardWindow(_employeeDb) { Owner = this };
+        if (wizard.ShowDialog() == true && wizard.Completed)
+        {
+            _attendanceRows.Clear();
+            foreach (var row in wizard.ResultAttendanceRows)
+                _attendanceRows.Add(row);
+            _salaryRows.Clear();
+            foreach (var row in wizard.ResultSalaryRows)
+                _salaryRows.Add(row);
+
+            BtnRecalc.IsEnabled = true;
+            BtnExportExcel.IsEnabled = true;
+            BtnExportPdf.IsEnabled = true;
+            BtnPrint.IsEnabled = true;
+            MainTabs.SelectedIndex = 1;
+            AutoSaveToDb();
+            StatusText.Text = $"Payroll completed: {_salaryRows.Count} employees, Rs {_salaryRows.Sum(r => r.NetSalary):N0} total.";
+        }
+    }
+
     private void BtnLoad_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new OpenFileDialog
@@ -79,6 +101,7 @@ public partial class MainWindow : Window
             }
 
             CalculateSalary();
+            ShowImportSummary();
             BtnRecalc.IsEnabled = true;
             BtnExportExcel.IsEnabled = true;
             BtnExportPdf.IsEnabled = true;
@@ -103,20 +126,35 @@ public partial class MainWindow : Window
 
     private void BtnPrevious_Click(object sender, RoutedEventArgs e)
     {
-        var dlg = new OpenFileDialog
+        if (!DatabaseService.IsConfigured)
         {
-            Filter = "Excel Files|*.xlsx",
-            Title = "Select Previous Salary Sheet"
-        };
-        if (dlg.ShowDialog() != true) return;
-        _previousFilePath = dlg.FileName;
-        var (db, carryOver) = FileReader.LoadPreviousOutput(_previousFilePath);
-        if (db.Count > 0)
-        {
-            _employeeDb.Clear();
-            foreach (var entry in db) _employeeDb.Add(entry);
+            // Fallback: open file like before
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Excel Files|*.xlsx",
+                Title = "Select Previous Salary Sheet"
+            };
+            if (dlg.ShowDialog() != true) return;
+            _previousFilePath = dlg.FileName;
+            var (db, carryOver) = FileReader.LoadPreviousOutput(_previousFilePath);
+            if (db.Count > 0)
+            {
+                _employeeDb.Clear();
+                foreach (var entry in db) _employeeDb.Add(entry);
+            }
+            StatusText.Text = $"Loaded previous data: {db.Count} employees.";
+            return;
         }
-        StatusText.Text = $"Loaded previous data: {db.Count} employees.";
+
+        var browser = new PreviousPayrollsWindow { Owner = this };
+        if (browser.ShowDialog() == true && browser.SelectedPeriodRows != null)
+        {
+            _salaryRows.Clear();
+            foreach (var row in browser.SelectedPeriodRows)
+                _salaryRows.Add(row);
+            MainTabs.SelectedIndex = 1; // Salary tab
+            StatusText.Text = $"Viewing previous: {browser.SelectedPeriodLabel} ({browser.SelectedPeriodRows.Count} employees)";
+        }
     }
 
 
@@ -185,6 +223,22 @@ public partial class MainWindow : Window
             var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
             _salaryRows.Add(sal);
         }
+        // Traffic light indicators
+        try
+        {
+            var averages = DatabaseService.GetEmployeeAverages(4);
+            foreach (var row in _salaryRows)
+            {
+                if (averages.TryGetValue(row.Name, out double avg) && avg > 0)
+                {
+                    double diff = Math.Abs((double)row.NetSalary - avg) / avg;
+                    row.StatusIndicator = diff <= 0.15 ? "🟢" : diff <= 0.30 ? "🟡" : "🔴";
+                }
+                else
+                    row.StatusIndicator = "⚪";
+            }
+        }
+        catch { }
         AutoSaveToDb();
     }
 
@@ -595,6 +649,27 @@ public partial class MainWindow : Window
             _employeeDb.Add(dlg.NewEmployee);
             StatusText.Text = $"Added employee: {dlg.NewEmployee.Name} (Rs {dlg.NewEmployee.DailyRate}/day, {dlg.NewEmployee.Category})";
         }
+    }
+
+    private void ShowImportSummary()
+    {
+        int employees = _attendanceRows.Select(r => r.Name).Distinct().Count();
+        int days = _attendanceRows.Select(r => r.Day).Distinct().Count();
+        int issues = _issueRows.Count;
+        int shortShifts = _attendanceRows.Count(r => !string.IsNullOrEmpty(r.Deduction) && r.Deduction != "00:00");
+
+        TxtImportSummary.Text = $"✅ Loaded {employees} employees · {days} days · {issues} missing punches · {shortShifts} short shifts";
+        ImportSummaryBanner.Visibility = System.Windows.Visibility.Visible;
+    }
+
+    private void BtnViewIssues_Click(object sender, RoutedEventArgs e)
+    {
+        IssuesTab.IsSelected = true;
+    }
+
+    private void BtnRules_Click(object sender, RoutedEventArgs e)
+    {
+        new SalaryRulesWindow { Owner = this }.ShowDialog();
     }
 
     private void BtnHelp_Click(object sender, RoutedEventArgs e)
