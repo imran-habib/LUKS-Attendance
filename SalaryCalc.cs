@@ -79,6 +79,10 @@ public static class SalaryCalc
     private const int LunchCutoffHour = 13;
     private const int RoundingMinutes = 15;
 
+    // Employees with 1-hour grace (no OT/deduction if within 7-9h effective)
+    private static readonly HashSet<string> GraceEmployees = new(StringComparer.OrdinalIgnoreCase)
+        { "Haseeb", "Zubair Khan" };
+
     public static AttendanceRow BuildAttendanceRow(PunchRecord rec)
     {
         if (string.IsNullOrEmpty(rec.InTime) || string.IsNullOrEmpty(rec.OutTime))
@@ -88,6 +92,10 @@ public static class SalaryCalc
         presence = RoundToNearest(presence, RoundingMinutes);
         var effective = CalcEffective(presence, rec.OutTime);
         var diff = effective - TimeSpan.FromHours(StandardWorkHours);
+
+        // Grace: if employee is in grace list and within +-1h, treat as exact 8h
+        if (GraceEmployees.Contains(rec.Name) && diff > TimeSpan.FromHours(-1) && diff < TimeSpan.FromHours(1))
+            diff = TimeSpan.Zero;
 
         return new AttendanceRow
         {

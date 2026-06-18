@@ -10,7 +10,7 @@ namespace LuksAttendance;
 
 public static class AutoUpdater
 {
-    private const string CurrentVersion = "3.1.0";
+    private const string CurrentVersion = "3.1.1";
     private const string RepoOwner = "imran-habib";
     private const string RepoName = "LUKS-Attendance";
     private const string ArtifactName = "LUKS-Attendance";
