@@ -31,7 +31,16 @@ public class IssueRow : System.ComponentModel.INotifyPropertyChanged
 public static class PunchParser
 {
     private static readonly Regex TimeRe = new(@"\d{2}:\d{2}");
-    private const int MidnightCutoffHour = 5;
+    // Punches before 03:30 next day count as previous day's exit
+    private const int MidnightCutoffHour = 3;
+    private const int MidnightCutoffMin = 30;
+
+    private static bool IsMidnightExit(string time)
+    {
+        int h = int.Parse(time[..2]);
+        int m = int.Parse(time[3..]);
+        return h < MidnightCutoffHour || (h == MidnightCutoffHour && m <= MidnightCutoffMin);
+    }
 
     public static (List<PunchRecord> records, List<IssueRow> issues) Parse(AttendanceData data)
     {
@@ -39,7 +48,7 @@ public static class PunchParser
         var issues = new List<IssueRow>();
         string lastDayLabel = data.Days.Count > 0 ? data.Days[^1].DateLabel : "";
 
-        // Track midnight punches (before 5am) as previous day's OUT
+        // Track midnight exit punches (before 3:30am) as previous day's OUT
         var prevDayOut = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
 
         for (int d = 1; d < data.Days.Count; d++)
@@ -51,8 +60,7 @@ public static class PunchParser
                 var times = TimeRe.Matches(raw);
                 if (times.Count == 0) continue;
 
-                int firstHour = int.Parse(times[0].Value[..2]);
-                if (firstHour < MidnightCutoffHour)
+                if (IsMidnightExit(times[0].Value))
                 {
                     var prevLabel = data.Days[d - 1].DateLabel;
                     prevDayOut[emp.Name.ToLower() + "|" + prevLabel] = times[0].Value;
@@ -71,17 +79,16 @@ public static class PunchParser
 
                 bool isLastDay = day.DateLabel == lastDayLabel;
 
-                // Filter out midnight punches (< 5am) — they belong to previous day
+                // Filter out midnight exit punches — they belong to previous day
                 var validTimes = new List<string>();
                 foreach (Match t in times)
                 {
-                    int h = int.Parse(t.Value[..2]);
-                    if (h >= MidnightCutoffHour)
+                    if (!IsMidnightExit(t.Value))
                         validTimes.Add(t.Value);
                 }
 
                 if (validTimes.Count == 0)
-                    continue;
+                    continue; // all punches were midnight exits for prev day
 
                 // Pick first valid IN (>= 6am preferred) and last as OUT
                 string inTime = validTimes[0];
@@ -93,17 +100,21 @@ public static class PunchParser
 
                 // Check if a midnight punch on next day serves as this day's OUT
                 string prevOutKey = emp.Name.ToLower() + "|" + day.DateLabel;
-                bool hasMidnightExit = prevDayOut.ContainsKey(prevOutKey);
+                bool hasMidnightExit = prevDayOut.TryGetValue(prevOutKey, out var midnightTime);
 
                 if (validTimes.Count == 1)
                 {
                     if (hasMidnightExit)
                     {
-                        // Single punch today but employee exited after midnight — count as full day
+                        // Single punch today + exit after midnight = cross-midnight shift
+                        // Calculate equivalent OUT by adding 24h to midnight punch
+                        // e.g. IN=08:10, exit=01:06 -> OUT expressed as 25:06 for calc
+                        // We store as special format "HH:MM+1" meaning next-day time
                         records.Add(new PunchRecord
                         {
                             Name = emp.Name, DayLabel = day.DateLabel,
-                            InTime = inTime, OutTime = "23:59"
+                            InTime = inTime, OutTime = midnightTime + "+1",
+                            Status = "midnight_exit"
                         });
                     }
                     else
@@ -119,7 +130,7 @@ public static class PunchParser
                 }
                 else
                 {
-                    // 2+ valid punches: first IN, last OUT — no duplicate issue
+                    // 2+ valid punches: first IN, last OUT
                     records.Add(new PunchRecord
                     {
                         Name = emp.Name, DayLabel = day.DateLabel,

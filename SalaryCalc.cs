@@ -144,8 +144,11 @@ public static class SalaryCalc
 
     private static TimeSpan CalcPresence(string inTime, string outTime)
     {
+        bool nextDay = outTime.EndsWith("+1");
+        var outClean = nextDay ? outTime[..5] : outTime;
         var inDt = TimeSpan.ParseExact(inTime, "hh\\:mm", CultureInfo.InvariantCulture);
-        var outDt = TimeSpan.ParseExact(outTime, "hh\\:mm", CultureInfo.InvariantCulture);
+        var outDt = TimeSpan.ParseExact(outClean, "hh\\:mm", CultureInfo.InvariantCulture);
+        if (nextDay) outDt += TimeSpan.FromHours(24);
         var diff = outDt - inDt;
         if (diff < TimeSpan.Zero) diff += TimeSpan.FromHours(24);
         return diff;
@@ -153,8 +156,10 @@ public static class SalaryCalc
 
     private static TimeSpan CalcEffective(TimeSpan presence, string outTime)
     {
-        int outHour = int.Parse(outTime[..2]);
-        if (outHour >= LunchCutoffHour)
+        var outClean = outTime.EndsWith("+1") ? outTime[..5] : outTime;
+        int outHour = int.Parse(outClean[..2]);
+        // Cross-midnight (+1) or OUT after 13:00 means lunch was taken
+        if (outTime.EndsWith("+1") || outHour >= LunchCutoffHour)
             return presence - TimeSpan.FromMinutes(LunchBreakMinutes);
         return presence;
     }
