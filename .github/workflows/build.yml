@@ -16,9 +16,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Embed build SHA
+      - name: Get version
+        id: version
         run: |
+          $ver = (Select-Xml -Path LuksAttendance.csproj -XPath '//Version').Node.InnerText
           $sha = "${{ github.sha }}".Substring(0,7)
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+          echo "SHA=$sha" >> $env:GITHUB_OUTPUT
           Set-Content -Path "build_sha.txt" -Value $sha
 
       - name: Restore
@@ -36,16 +40,16 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.sha }}
-          name: "LUKS Attendance v3.2.0 (build ${{ github.sha }})"
-          body: "Automated build from commit ${{ github.sha }}. Download the .exe below — no installation needed, just run it."
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: "LUKS Attendance v${{ steps.version.outputs.VERSION }}"
+          body: "v${{ steps.version.outputs.VERSION }} (build ${{ steps.version.outputs.SHA }}) — Download the .exe below. No installation needed, just run it."
           files: ./publish/LUKS-Attendance.exe
           make_latest: true
 
       - name: Upload artifact (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: LUKS-Attendance
+          name: LUKS-Attendance-v${{ steps.version.outputs.VERSION }}
           path: |
             ./publish/LUKS-Attendance.exe
             ./publish/build_sha.txt
