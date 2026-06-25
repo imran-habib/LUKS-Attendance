@@ -584,16 +584,26 @@ public partial class MainWindow : Window
             BtnWeekly.FontWeight = FontWeights.Normal;
         }
 
-        if (_data == null || _attendanceRows == null)
+        if (_data == null)
         {
             // Bug #7 fix: after device import _data is null — just re-filter existing rows
-            if (_attendanceRows.Count > 0)
+            if (_attendanceRows != null && _attendanceRows.Count > 0)
             {
                 CalculateSalary();
                 StatusText.Text = $"Showing {(BtnMonthly.IsChecked == true ? "monthly" : "weekly")} employees: {_salaryRows.Count} in salary.";
             }
             return;
         }
+
+
+
+
+
+
+
+
+
+
         // Reload with new filter
         var (records, issues) = PunchParser.Parse(_data);
         _attendanceRows.Clear();

@@ -4,7 +4,7 @@ Windows desktop application for attendance processing and salary calculation. Bu
 
 ## ⬇️ Download
 
-**[Download LUKS-Attendance.exe (Latest)](https://github.com/imran-habib/LUKS-Attendance/releases/latest/download/LUKS-Attendance.exe)**
+**[Download LUKS-Attendance_v3.2.0.exe](https://github.com/imran-habib/LUKS-Attendance/releases/latest)**
 
 No installation needed — just download and run the .exe.
 

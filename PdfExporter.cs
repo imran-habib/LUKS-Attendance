@@ -105,7 +105,7 @@ public static class PdfExporter
     private static string? GetLogoPath()
     {
         // Try to find logo relative to exe location
-        var exeDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? ".";
+        var exeDir = System.AppContext.BaseDirectory;
         var candidates = new[]
         {
             System.IO.Path.Combine(exeDir, "assets", "logo_transparent.png"),
