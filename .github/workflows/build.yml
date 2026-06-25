@@ -21,14 +21,17 @@ jobs:
           $sha = "${{ github.sha }}".Substring(0,7)
           Set-Content -Path "build_sha.txt" -Value $sha
 
+      - name: Restore
+        run: dotnet restore LuksAttendance.sln
+
+      - name: Run tests
+        run: dotnet test tests/LuksAttendance.Tests.csproj -c Release
+
       - name: Publish
         run: dotnet publish LuksAttendance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
 
       - name: Copy SHA to publish
         run: Copy-Item "build_sha.txt" "./publish/build_sha.txt"
-
-      - name: Run tests
-        run: dotnet test tests/LuksAttendance.Tests.csproj -c Release --no-restore
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
