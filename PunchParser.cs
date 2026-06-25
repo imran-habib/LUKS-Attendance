@@ -60,10 +60,10 @@ public static class PunchParser
                 var times = TimeRe.Matches(raw);
                 if (times.Count == 0) continue;
 
-                if (IsMidnightExit(times[0].Value))
+                string lastMidnight = ""; foreach (Match mt in times) { if (IsMidnightExit(mt.Value)) lastMidnight = mt.Value; else break; } if (!string.IsNullOrEmpty(lastMidnight))
                 {
                     var prevLabel = data.Days[d - 1].DateLabel;
-                    prevDayOut[emp.Name.ToLower() + "|" + prevLabel] = times[0].Value;
+                    prevDayOut[emp.Name.ToLower() + "|" + prevLabel] = lastMidnight;
                 }
             }
         }
