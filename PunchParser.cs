@@ -31,6 +31,7 @@ public class IssueRow : System.ComponentModel.INotifyPropertyChanged
 public static class PunchParser
 {
     private static readonly Regex TimeRe = new(@"\d{2}:\d{2}");
+    private const int MidnightCutoffHour = 5;
 
     public static (List<PunchRecord> records, List<IssueRow> issues) Parse(AttendanceData data)
     {
@@ -38,6 +39,28 @@ public static class PunchParser
         var issues = new List<IssueRow>();
         string lastDayLabel = data.Days.Count > 0 ? data.Days[^1].DateLabel : "";
 
+        // Track midnight punches (before 5am) as previous day's OUT
+        var prevDayOut = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+
+        for (int d = 1; d < data.Days.Count; d++)
+        {
+            var day = data.Days[d];
+            foreach (var emp in data.Employees)
+            {
+                if (!emp.Punches.TryGetValue(day.DateLabel, out var raw)) continue;
+                var times = TimeRe.Matches(raw);
+                if (times.Count == 0) continue;
+
+                int firstHour = int.Parse(times[0].Value[..2]);
+                if (firstHour < MidnightCutoffHour)
+                {
+                    var prevLabel = data.Days[d - 1].DateLabel;
+                    prevDayOut[emp.Name.ToLower() + "|" + prevLabel] = times[0].Value;
+                }
+            }
+        }
+
+        // Main pass
         foreach (var emp in data.Employees)
         {
             foreach (var day in data.Days)
@@ -48,46 +71,59 @@ public static class PunchParser
 
                 bool isLastDay = day.DateLabel == lastDayLabel;
 
-                if (times.Count == 1)
+                // Filter out midnight punches (< 5am) — they belong to previous day
+                var validTimes = new List<string>();
+                foreach (Match t in times)
                 {
-                    issues.Add(new IssueRow
-                    {
-                        Name = emp.Name, DayLabel = day.DateLabel,
-                        Type = isLastDay ? "Last Day OUT" : "Missing OUT",
-                        InTime = times[0].Value,
-                        OutTime = "?" // needs HR input
-                    });
+                    int h = int.Parse(t.Value[..2]);
+                    if (h >= MidnightCutoffHour)
+                        validTimes.Add(t.Value);
                 }
-                else if (times.Count == 2)
+
+                if (validTimes.Count == 0)
+                    continue;
+
+                // Pick first valid IN (>= 6am preferred) and last as OUT
+                string inTime = validTimes[0];
+                foreach (var t in validTimes)
                 {
-                    records.Add(new PunchRecord
+                    if (int.Parse(t[..2]) >= 6) { inTime = t; break; }
+                }
+                string outTime = validTimes[^1];
+
+                // Check if a midnight punch on next day serves as this day's OUT
+                string prevOutKey = emp.Name.ToLower() + "|" + day.DateLabel;
+                bool hasMidnightExit = prevDayOut.ContainsKey(prevOutKey);
+
+                if (validTimes.Count == 1)
+                {
+                    if (hasMidnightExit)
                     {
-                        Name = emp.Name, DayLabel = day.DateLabel,
-                        InTime = times[0].Value, OutTime = times[1].Value
-                    });
+                        // Single punch today but employee exited after midnight — count as full day
+                        records.Add(new PunchRecord
+                        {
+                            Name = emp.Name, DayLabel = day.DateLabel,
+                            InTime = inTime, OutTime = "23:59"
+                        });
+                    }
+                    else
+                    {
+                        issues.Add(new IssueRow
+                        {
+                            Name = emp.Name, DayLabel = day.DateLabel,
+                            Type = isLastDay ? "Last Day OUT" : "Missing OUT",
+                            InTime = inTime,
+                            OutTime = "?"
+                        });
+                    }
                 }
                 else
                 {
-                    string inTime = times[0].Value;
-                    for (int i = 0; i < times.Count; i++)
-                    {
-                        int h = int.Parse(times[i].Value[..2]);
-                        if (h >= 6) { inTime = times[i].Value; break; }
-                    }
-                    string outTime = times[^1].Value;
-
+                    // 2+ valid punches: first IN, last OUT — no duplicate issue
                     records.Add(new PunchRecord
                     {
                         Name = emp.Name, DayLabel = day.DateLabel,
-                        InTime = inTime, OutTime = outTime,
-                        Status = "multi_punch_verify"
-                    });
-                    issues.Add(new IssueRow
-                    {
-                        Name = emp.Name, DayLabel = day.DateLabel,
-                        Type = "Multi-Punch (verify)",
-                        InTime = inTime,
-                        OutTime = outTime + " (auto)"
+                        InTime = inTime, OutTime = outTime
                     });
                 }
             }
