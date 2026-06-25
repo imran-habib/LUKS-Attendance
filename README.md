@@ -15,7 +15,7 @@ No installation needed — just download and run the .exe.
 ## How to Use
 
 1. Run `LUKS-Attendance.exe`
-2. Login (default: admin / Admin1234)
+2. Login with your credentials
 3. Click **📂 Load Attendance** → select your `.xlsx` file from the attendance machine
 4. Go to **⚠️ Issues** tab → enter OUT times for last day and missing punches
 5. Review **💰 Salary** tab → edit Advance/Arrears/Extra Hrs (auto-recalculates)
@@ -47,15 +47,6 @@ Where:
 - NetHours = OT hours − Deduction hours
 - Worked hours = Presence − 1h lunch (if OUT ≥ 13:00)
 - 15-minute rounding applied after lunch deduction
-
-## Custom Login
-
-To change the default login credentials, create a file named `luks_credentials.txt` in the same folder as the .exe:
-
-```
-myusername
-mypassword
-```
 
 ## Auto-Build
 
