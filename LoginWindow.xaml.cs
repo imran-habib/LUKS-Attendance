@@ -1,4 +1,6 @@
 #nullable enable
+using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 
@@ -23,7 +25,8 @@ public partial class LoginWindow : Window
 
     private void TryLogin()
     {
-        if (TxtUsername.Text.Trim() == "admin" && TxtPassword.Password == "Admin1234")
+        var (user, pass) = LoadCredentials();
+        if (TxtUsername.Text.Trim() == user && TxtPassword.Password == pass)
         {
             Authenticated = true;
             Close();
@@ -34,5 +37,18 @@ public partial class LoginWindow : Window
             TxtPassword.Clear();
             TxtPassword.Focus();
         }
+    }
+
+    private static (string user, string pass) LoadCredentials()
+    {
+        // Bug #10 fix: load from config file, fallback to defaults
+        var configPath = System.IO.Path.Combine(AppContext.BaseDirectory, "luks_credentials.txt");
+        if (System.IO.File.Exists(configPath))
+        {
+            var lines = System.IO.File.ReadAllLines(configPath);
+            if (lines.Length >= 2)
+                return (lines[0].Trim(), lines[1].Trim());
+        }
+        return ("admin", "Admin1234");
     }
 }

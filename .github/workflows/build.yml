@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -20,12 +22,24 @@ jobs:
           Set-Content -Path "build_sha.txt" -Value $sha
 
       - name: Publish
-        run: dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
+        run: dotnet publish LuksAttendance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./publish
 
       - name: Copy SHA to publish
         run: Copy-Item "build_sha.txt" "./publish/build_sha.txt"
 
-      - name: Upload artifact
+      - name: Run tests
+        run: dotnet test tests/LuksAttendance.Tests.csproj -c Release --no-restore
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.sha }}
+          name: "LUKS Attendance v3.2.0 (build ${{ github.sha }})"
+          body: "Automated build from commit ${{ github.sha }}. Download the .exe below — no installation needed, just run it."
+          files: ./publish/LUKS-Attendance.exe
+          make_latest: true
+
+      - name: Upload artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: LUKS-Attendance

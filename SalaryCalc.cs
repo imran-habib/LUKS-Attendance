@@ -79,28 +79,35 @@ public static class SalaryCalc
     private const int LunchCutoffHour = 13;
     private const int RoundingMinutes = 15;
 
-    // Employees with 1-hour grace (no OT/deduction if within 7-9h effective)
+    // Grace window is (-1h, +1h) EXCLUSIVE by business decision (confirmed with owner).
+    // At exactly 7h or 9h effective, OT/deduction DOES apply. This is intentional.
+    // Legacy name-based list kept for backward compat; prefer EmployeeEntry.IsGrace flag.
     private static readonly HashSet<string> GraceEmployees = new(StringComparer.OrdinalIgnoreCase)
         { "Haseeb", "Zubair Khan" };
 
-    public static AttendanceRow BuildAttendanceRow(PunchRecord rec)
+    public static AttendanceRow BuildAttendanceRow(PunchRecord rec, bool isGrace = false)
     {
         if (string.IsNullOrEmpty(rec.InTime) || string.IsNullOrEmpty(rec.OutTime))
             return new AttendanceRow { Name = rec.Name, Day = rec.DayLabel, Status = rec.Status };
 
         var presence = CalcPresence(rec.InTime, rec.OutTime);
-        presence = RoundToNearest(presence, RoundingMinutes);
+        // Bug #4 fix: deduct lunch first, then round
         var effective = CalcEffective(presence, rec.OutTime);
+        effective = RoundToNearest(effective, RoundingMinutes);
         var diff = effective - TimeSpan.FromHours(StandardWorkHours);
 
-        // Grace: if employee is in grace list and within +-1h, treat as exact 8h
-        if (GraceEmployees.Contains(rec.Name) && diff > TimeSpan.FromHours(-1) && diff < TimeSpan.FromHours(1))
+        // Bug #11 fix: grace from EmployeeEntry.IsGrace (fallback to hardcoded for compat)
+        bool hasGrace = isGrace || GraceEmployees.Contains(rec.Name);
+        if (hasGrace && diff > TimeSpan.FromHours(-1) && diff < TimeSpan.FromHours(1))
             diff = TimeSpan.Zero;
+
+        // Bug #14 fix: hide +1 internal format from user-facing UI
+        var displayOut = rec.OutTime.EndsWith("+1") ? rec.OutTime[..5] + " (next day)" : rec.OutTime;
 
         return new AttendanceRow
         {
             Name = rec.Name, Day = rec.DayLabel,
-            InTime = rec.InTime, OutTime = rec.OutTime,
+            InTime = rec.InTime, OutTime = displayOut,
             Worked = FormatTs(effective),
             OT = diff > TimeSpan.Zero ? FormatTs(diff) : "",
             Deduction = diff < TimeSpan.Zero ? FormatTs(diff.Negate()) : "",
@@ -109,11 +116,30 @@ public static class SalaryCalc
     }
 
     public static SalaryRow Calculate(string nameKey, List<AttendanceRow> rows, int dailyRate,
-        decimal advance, decimal arrears, string category = "")
+        decimal advance, decimal arrears, string category = "", bool isMonthly = false)
     {
+        int daysWorked = rows.Count(r => !string.IsNullOrEmpty(r.Worked));
+
+        // Monthly: just days x rate, no OT/deduction
+        if (isMonthly)
+        {
+            var mRow = new SalaryRow
+            {
+                Category = category,
+                Name = string.Join(" ", nameKey.Split(' ').Where(w => w.Length > 0).Select(w =>
+                    char.ToUpper(w[0]) + w[1..])),
+                Days = daysWorked, OtHours = 0, DedHours = 0,
+                NetHours = 0, DailyRate = dailyRate,
+                HourlyRate = 0,
+            };
+            mRow.ExtraHrs = 0;
+            mRow.Advance = advance;
+            mRow.Arrears = arrears;
+            return mRow;
+        }
+
         var totalOt = TimeSpan.Zero;
         var totalDed = TimeSpan.Zero;
-        int daysWorked = rows.Count(r => !string.IsNullOrEmpty(r.Worked));
 
         foreach (var row in rows)
         {
@@ -130,8 +156,9 @@ public static class SalaryCalc
         var row2 = new SalaryRow
         {
             Category = category,
-            Name = string.Join(" ", nameKey.Split(' ').Select(w =>
-                char.ToUpper(w[0]) + w[1..])),
+            Name = string.Join(" ", nameKey.Split(' ')
+                .Where(w => w.Length > 0)
+                .Select(w => char.ToUpper(w[0]) + w[1..])),
             Days = daysWorked, OtHours = otH, DedHours = dedH,
             NetHours = netH, DailyRate = dailyRate,
             HourlyRate = Math.Round(hourlyRate, 2),
@@ -154,12 +181,16 @@ public static class SalaryCalc
         return diff;
     }
 
+    private static readonly TimeSpan NightLunchThreshold = TimeSpan.FromHours(5);
+
     private static TimeSpan CalcEffective(TimeSpan presence, string outTime)
     {
         var outClean = outTime.EndsWith("+1") ? outTime[..5] : outTime;
         int outHour = int.Parse(outClean[..2]);
-        // Cross-midnight (+1) or OUT after 13:00 means lunch was taken
-        if (outTime.EndsWith("+1") || outHour >= LunchCutoffHour)
+        // Bug #3 fix: cross-midnight lunch only if shift >= 5h
+        if (outTime.EndsWith("+1"))
+            return presence >= NightLunchThreshold ? presence - TimeSpan.FromMinutes(LunchBreakMinutes) : presence;
+        if (outHour >= LunchCutoffHour)
             return presence - TimeSpan.FromMinutes(LunchBreakMinutes);
         return presence;
     }

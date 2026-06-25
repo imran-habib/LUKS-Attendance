@@ -133,26 +133,38 @@ public partial class PayrollWizardWindow : Window
 
         var isMonthly = RbMonthly.IsChecked == true;
 
+        var monthlyPresence = new HashSet<string>();
         foreach (var issue in issues)
         {
             if (empTypes.TryGetValue(issue.Name.ToLower(), out var iType) && iType == "excluded") continue;
-            if (isMonthly && empTypes.TryGetValue(issue.Name.ToLower(), out var mType) && mType == "monthly")
+            if (empTypes.TryGetValue(issue.Name.ToLower(), out var mType) && mType == "monthly")
             {
-                var pRec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = issue.InTime, Status = "present" };
-                _attRows.Add(SalaryCalc.BuildAttendanceRow(pRec));
+                monthlyPresence.Add(issue.Name.ToLower() + "|" + issue.DayLabel);
                 continue;
             }
             if (!isMonthly && empTypes.TryGetValue(issue.Name.ToLower(), out var wType) && wType != "weekly") continue;
-            if (isMonthly && empTypes.TryGetValue(issue.Name.ToLower(), out var wType2) && wType2 != "monthly") continue;
+            if (isMonthly) continue; // monthly handled above
             _issues.Add(issue);
         }
 
         foreach (var rec in records)
         {
             if (empTypes.TryGetValue(rec.Name.ToLower(), out var rType) && rType == "excluded") continue;
+            if (empTypes.TryGetValue(rec.Name.ToLower(), out var mType2) && mType2 == "monthly")
+            {
+                monthlyPresence.Add(rec.Name.ToLower() + "|" + rec.DayLabel);
+                continue;
+            }
             if (!isMonthly && empTypes.TryGetValue(rec.Name.ToLower(), out var wt) && wt != "weekly") continue;
-            if (isMonthly && empTypes.TryGetValue(rec.Name.ToLower(), out var mt) && mt != "monthly") continue;
+            if (isMonthly) continue;
             _attRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+        }
+
+        // Monthly: just presence markers
+        foreach (var key in monthlyPresence)
+        {
+            var parts = key.Split('|', 2);
+            _attRows.Add(new AttendanceRow { Name = parts[0], Day = parts[1], Worked = "present", Status = "monthly" });
         }
 
         int employees = _attRows.Select(r => r.Name).Distinct().Count();
@@ -213,7 +225,7 @@ public partial class PayrollWizardWindow : Window
             if (!dbDict.TryGetValue(grp.Key, out var entry)) continue;
             if (entry.Type == "excluded") continue;
             if (entry.Type != mode) continue;
-            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
+            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category, entry.Type == "monthly");
             _salaryRows.Add(sal);
         }
 

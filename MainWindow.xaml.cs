@@ -6,6 +6,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using System.Text.RegularExpressions;
 
 namespace LuksAttendance;
 
@@ -79,15 +80,15 @@ public partial class MainWindow : Window
                 if (!string.IsNullOrWhiteSpace(emp.Name))
                     empTypes[emp.Name.ToLower()] = emp.Type;
 
+            // Monthly employees: just count presence (any punch = 1 day), no OT logic
+            var monthlyPresence = new HashSet<string>();
             foreach (var issue in issues)
             {
                 if (empTypes.TryGetValue(issue.Name.ToLower(), out var iType) && iType == "excluded")
                     continue;
-                // Monthly employees: single punch = present, not an issue
                 if (empTypes.TryGetValue(issue.Name.ToLower(), out var mType2) && mType2 == "monthly")
                 {
-                    var pRec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = issue.InTime, Status = "present" };
-                    _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(pRec));
+                    monthlyPresence.Add(issue.Name.ToLower() + "|" + issue.DayLabel);
                     continue;
                 }
                 _issueRows.Add(issue);
@@ -97,7 +98,19 @@ public partial class MainWindow : Window
             {
                 if (empTypes.TryGetValue(rec.Name.ToLower(), out var rType) && rType == "excluded")
                     continue;
+                if (empTypes.TryGetValue(rec.Name.ToLower(), out var mType3) && mType3 == "monthly")
+                {
+                    monthlyPresence.Add(rec.Name.ToLower() + "|" + rec.DayLabel);
+                    continue;
+                }
                 _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            }
+
+            // Add monthly presence as simple attendance markers
+            foreach (var key in monthlyPresence)
+            {
+                var parts = key.Split('|', 2);
+                _attendanceRows.Add(new AttendanceRow { Name = parts[0], Day = parts[1], Worked = "present", Status = "monthly" });
             }
 
             CalculateSalary();
@@ -185,8 +198,12 @@ public partial class MainWindow : Window
 
         if (!dlg.Confirmed) return;
 
+        int added = 0;
         foreach (var day in dlg.SelectedDays)
         {
+            // Bug #2 fix: prevent duplicate employee+day entries
+            if (_attendanceRows.Any(r => r.Name.Equals(dlg.SelectedName, StringComparison.OrdinalIgnoreCase) && r.Day == day))
+                continue;
             var rec = new PunchRecord
             {
                 Name = dlg.SelectedName,
@@ -196,10 +213,16 @@ public partial class MainWindow : Window
                 Status = "manual"
             };
             _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            added++;
         }
 
+        if (added == 0)
+        {
+            MessageBox.Show("All selected days already have attendance entries for this employee.", "Duplicate", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         CalculateSalary();
-        StatusText.Text = $"Added {dlg.SelectedDays.Count} manual entries for {dlg.SelectedName}.";
+        StatusText.Text = $"Added {added} manual entries for {dlg.SelectedName}.";
     }
 
     private void CalculateSalary()
@@ -218,9 +241,11 @@ public partial class MainWindow : Window
         {
             if (!dbDict.TryGetValue(grp.Key, out var entry)) continue;
             if (entry.Type == "excluded") continue;
+            // Bug #13 fix: skip employees with invalid rate
+            if (entry.DailyRate <= 0 && entry.Type != "excluded") continue;
             if (entry.Type != (BtnMonthly.IsChecked == true ? "monthly" : "weekly")) continue;
 
-            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category);
+            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category, entry.Type == "monthly");
             _salaryRows.Add(sal);
         }
         // Traffic light indicators
@@ -239,7 +264,6 @@ public partial class MainWindow : Window
             }
         }
         catch { }
-        AutoSaveToDb();
     }
 
     private void AutoSaveToDb()
@@ -323,7 +347,14 @@ public partial class MainWindow : Window
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var dt))
             {
-                dt = new DateTime(DateTime.Today.Year, dt.Month, dt.Day);
+                // Bug #5 fix: use year from data duration, not Today
+                int year = DateTime.Today.Year;
+                if (_data?.Duration != null)
+                {
+                    var ym = System.Text.RegularExpressions.Regex.Match(_data.Duration, @"(\d{4})");
+                    if (ym.Success) year = int.Parse(ym.Groups[1].Value);
+                }
+                dt = new DateTime(year, dt.Month, dt.Day);
                 dates.Add(dt);
             }
         }
@@ -553,7 +584,16 @@ public partial class MainWindow : Window
             BtnWeekly.FontWeight = FontWeights.Normal;
         }
 
-        if (_data == null || _attendanceRows == null) return;
+        if (_data == null || _attendanceRows == null)
+        {
+            // Bug #7 fix: after device import _data is null — just re-filter existing rows
+            if (_attendanceRows.Count > 0)
+            {
+                CalculateSalary();
+                StatusText.Text = $"Showing {(BtnMonthly.IsChecked == true ? "monthly" : "weekly")} employees: {_salaryRows.Count} in salary.";
+            }
+            return;
+        }
         // Reload with new filter
         var (records, issues) = PunchParser.Parse(_data);
         _attendanceRows.Clear();
@@ -564,15 +604,14 @@ public partial class MainWindow : Window
             if (!string.IsNullOrWhiteSpace(emp.Name))
                 empTypes[emp.Name.ToLower()] = emp.Type;
 
+        var monthlyPresence = new HashSet<string>();
         foreach (var issue in issues)
         {
             if (empTypes.TryGetValue(issue.Name.ToLower(), out var iType) && iType == "excluded")
                 continue;
-            // Monthly employees: single punch = present, not an issue
             if (empTypes.TryGetValue(issue.Name.ToLower(), out var mType2) && mType2 == "monthly")
             {
-                var pRec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = issue.InTime, Status = "present" };
-                _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(pRec));
+                monthlyPresence.Add(issue.Name.ToLower() + "|" + issue.DayLabel);
                 continue;
             }
             _issueRows.Add(issue);
@@ -582,7 +621,18 @@ public partial class MainWindow : Window
         {
             if (empTypes.TryGetValue(rec.Name.ToLower(), out var rType) && rType == "excluded")
                 continue;
+            if (empTypes.TryGetValue(rec.Name.ToLower(), out var mType3) && mType3 == "monthly")
+            {
+                monthlyPresence.Add(rec.Name.ToLower() + "|" + rec.DayLabel);
+                continue;
+            }
             _attendanceRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+        }
+
+        foreach (var key in monthlyPresence)
+        {
+            var parts = key.Split('|', 2);
+            _attendanceRows.Add(new AttendanceRow { Name = parts[0], Day = parts[1], Worked = "present", Status = "monthly" });
         }
 
         CalculateSalary();
@@ -752,7 +802,7 @@ IMPORTANT NOTES:
 
     private void LoadDefaultEmployeeDb()
     {
-        foreach (var (name, rate, type, category) in DefaultData.Employees)
-            _employeeDb.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type, Category = category });
+        foreach (var (name, rate, type, category, isGrace) in DefaultData.Employees)
+            _employeeDb.Add(new EmployeeEntry { Name = name, DailyRate = rate, Type = type, Category = category, IsGrace = isGrace });
     }
 }

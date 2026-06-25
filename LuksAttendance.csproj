@@ -8,9 +8,15 @@
     <RootNamespace>LuksAttendance</RootNamespace>
     <AssemblyName>LUKS-Attendance</AssemblyName>
     <ApplicationIcon>assets\logo.ico</ApplicationIcon>
-    <Version>3.1.1</Version>
+    <Version>3.2.0</Version>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Remove="tests\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.2" />

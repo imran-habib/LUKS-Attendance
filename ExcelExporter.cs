@@ -25,7 +25,7 @@ public static class ExcelExporter
 
         // Column headers in row 3
         string[] salHeaders = { "Category", "Name", "Days", "OT (hrs)", "Deduction (hrs)", "Net Hours",
-            "Extra Hrs", "Advance", "Arrears", "Net Salary" };
+            "Daily Rate", "Hourly Rate", "Extra Hrs", "Advance", "Arrears", "Net Salary" };
         for (int c = 0; c < salHeaders.Length; c++)
             wsSal.Cell(3, c + 1).Value = salHeaders[c];
         wsSal.Row(3).Style.Font.Bold = true;
@@ -51,17 +51,19 @@ public static class ExcelExporter
             wsSal.Cell(row, 4).Value = r.OtHours;
             wsSal.Cell(row, 5).Value = r.DedHours;
             wsSal.Cell(row, 6).Value = r.NetHours;
-            wsSal.Cell(row, 7).Value = r.ExtraHrs;
-            wsSal.Cell(row, 8).Value = (double)r.Advance;
-            wsSal.Cell(row, 9).Value = (double)r.Arrears;
-            wsSal.Cell(row, 10).Value = (double)r.NetSalary;
+            wsSal.Cell(row, 7).Value = r.DailyRate;
+            wsSal.Cell(row, 8).Value = r.HourlyRate;
+            wsSal.Cell(row, 9).Value = r.ExtraHrs;
+            wsSal.Cell(row, 10).Value = (double)r.Advance;
+            wsSal.Cell(row, 11).Value = (double)r.Arrears;
+            wsSal.Cell(row, 12).Value = (double)r.NetSalary;
             row++;
         }
 
         // Total row
         row++;
         wsSal.Cell(row, 1).Value = "TOTAL";
-        wsSal.Cell(row, 10).FormulaA1 = $"=SUM(J4:J{row - 1})";
+        wsSal.Cell(row, 12).FormulaA1 = $"=SUM(L4:L{row - 1})";
         wsSal.Row(row).Style.Font.Bold = true;
         wsSal.Columns().AdjustToContents();
 

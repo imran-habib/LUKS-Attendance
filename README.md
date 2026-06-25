@@ -1,35 +1,40 @@
-# LUKS-Attendance
+# LUKS Attendance & Salary Software
 
 Windows desktop application for attendance processing and salary calculation. Built with C# WPF (.NET 8).
 
-## Download
+## ⬇️ Download
 
-Get the latest .exe from [Actions → latest build → Artifacts](https://github.com/imran-habib/LUKS-Attendance/actions).
+**[Download LUKS-Attendance.exe (Latest)](https://github.com/imran-habib/LUKS-Attendance/releases/latest/download/LUKS-Attendance.exe)**
 
-No installation needed — just run the .exe.
+No installation needed — just download and run the .exe.
+
+> Size: ~91 MB | Requires: Windows 10/11 (64-bit)
+
+---
 
 ## How to Use
 
 1. Run `LUKS-Attendance.exe`
-2. Click **📂 Load Attendance** → select your `.xlsx` file from the attendance machine
-3. Go to **⚠️ Issues** tab → enter OUT times for last day and missing punches
-4. Review **💰 Salary** tab → edit Advance/Arrears/Extra Hrs (auto-recalculates)
-5. Click **📄 Export PDF** or **🖨️ Print** for records
+2. Login (default: admin / Admin1234)
+3. Click **📂 Load Attendance** → select your `.xlsx` file from the attendance machine
+4. Go to **⚠️ Issues** tab → enter OUT times for last day and missing punches
+5. Review **💰 Salary** tab → edit Advance/Arrears/Extra Hrs (auto-recalculates)
+6. Click **📄 Export PDF** or **🖨️ Print** for records
 
 ## Features
 
-- Load `.xlsx` attendance files from attendance software
-- In-app review: Attendance, Salary, Employee DB, Issues tabs
-- Interactive issue resolution (missing punches, last-day OUT times)
-- Live salary recalculation when editing Advance/Arrears/Extra Hrs
-- PDF export for record-keeping
-- Print directly to any printer
-- Excel export with 3 tabs (Attendance, Salary, Employee DB)
-- Lunch break: 1h deducted if OUT ≥ 13:00, no deduction for half days (OUT < 13:00)
-- 15-minute rounding on worked hours
-- OT/Deduction at hourly rate (Daily Rate ÷ 8)
-- Monthly workers tracked for presence only (not in salary)
-- Owners/managers excluded from salary
+- Load `.xls/.xlsx` attendance files (single or multi-file merge for cross-month weeks)
+- Payroll Wizard (4-step guided flow)
+- Auto-resolve midnight exits (punches before 3:30am = previous day's exit)
+- Weekly workers: full OT/deduction (8h standard, 15-min rounding, 1h lunch if OUT ≥ 13:00)
+- Monthly workers: just count presence days (any punch = 1 day)
+- Grace period for configurable employees (checkbox in Employee DB)
+- Traffic light indicators (🟢🟡🔴) comparing salary to 4-week average
+- Analytics tab with trend charts, category breakdown, OT tracking, forecasting
+- Direct device connection (ZK protocol over TCP)
+- PDF/Excel export with DailyRate and HourlyRate columns
+- SQLite history for previous payrolls
+- Auto-updater checks GitHub for new builds
 
 ## Salary Formula
 
@@ -41,7 +46,17 @@ Where:
 - HourlyRate = DailyRate ÷ 8
 - NetHours = OT hours − Deduction hours
 - Worked hours = Presence − 1h lunch (if OUT ≥ 13:00)
+- 15-minute rounding applied after lunch deduction
+
+## Custom Login
+
+To change the default login credentials, create a file named `luks_credentials.txt` in the same folder as the .exe:
+
+```
+myusername
+mypassword
+```
 
 ## Auto-Build
 
-Every push to `main` triggers GitHub Actions which builds a fresh Windows .exe automatically.
+Every push to `main` triggers GitHub Actions which builds a fresh .exe and publishes it as a [GitHub Release](https://github.com/imran-habib/LUKS-Attendance/releases/latest).

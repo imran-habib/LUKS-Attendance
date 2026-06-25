@@ -129,6 +129,7 @@
                                     </x:Array>
                                 </DataGridComboBoxColumn.ItemsSource>
                             </DataGridComboBoxColumn>
+                            <DataGridCheckBoxColumn Header="Grace" Binding="{Binding IsGrace}" Width="50"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5,8">

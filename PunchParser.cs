@@ -88,7 +88,20 @@ public static class PunchParser
                 }
 
                 if (validTimes.Count == 0)
-                    continue; // all punches were midnight exits for prev day
+                {
+                    // Bug #9 fix: if first day and only midnight punches, keep as issue
+                    if (data.Days.IndexOf(day) == 0)
+                    {
+                        var firstTime = times[0].Value;
+                        issues.Add(new IssueRow
+                        {
+                            Name = emp.Name, DayLabel = day.DateLabel,
+                            Type = "Unmatched exit (prior period)",
+                            InTime = firstTime, OutTime = "?"
+                        });
+                    }
+                    continue;
+                }
 
                 // Pick first valid IN (>= 6am preferred) and last as OUT
                 string inTime = validTimes[0];
