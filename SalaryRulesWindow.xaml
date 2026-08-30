@@ -1,7 +1,7 @@
 <Window x:Class="LuksAttendance.SalaryRulesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Salary Rules" Height="480" Width="520"
+        Title="Salary Rules &amp; OT Configuration" Height="700" Width="650"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Icon="Assets/logo.png">
     <Grid Margin="20">
@@ -11,42 +11,63 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="📐 Salary Calculation Rules" FontSize="18" FontWeight="Bold" Margin="0,0,0,15"/>
+        <TextBlock Grid.Row="0" Text="📐 Salary Rules &amp; OT Configuration" FontSize="18" FontWeight="Bold" Margin="0,0,0,12"/>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="⏱ Working Hours" FontSize="14" FontWeight="Bold" Margin="0,0,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
-                    Text="• Standard workday = 8 hours&#x0a;• 1 hour lunch is deducted ONLY if OUT is after 1:00 PM&#x0a;• If OUT before 1:00 PM → no lunch deducted (half-day counted as-is)"/>
-
-                <TextBlock Text="⏲ Time Rounding" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
-                    Text="• All hours are rounded to the nearest 15 minutes&#x0a;• Example: 7h 52m → 8h 00m | 7h 37m → 7h 30m"/>
-
-                <TextBlock Text="📈 Overtime &amp; Deductions" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
-                    Text="• Overtime (OT) = hours worked BEYOND 8 in a day&#x0a;• Deduction = hours SHORT of 8 in a day&#x0a;• Net Hours = Total OT − Total Deductions for the period"/>
-
-                <TextBlock Text="💰 Rate Calculation" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
-                    Text="• Hourly Rate = Daily Rate ÷ 8&#x0a;• Each employee has a fixed Daily Rate set in Employee DB"/>
-
-                <TextBlock Text="🧮 Net Salary Formula" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <Border Background="#F0F4FF" Padding="12" CornerRadius="4" Margin="10,0,0,10">
-                    <TextBlock TextWrapping="Wrap" FontSize="13" FontFamily="Consolas"
-                        Text="Net Salary = (Days × Daily Rate)&#x0a;           + (Net Hours × Hourly Rate)&#x0a;           − Advance&#x0a;           + Arrears"/>
+                <!-- Rules display -->
+                <Border Background="#F8F9FC" Padding="14" CornerRadius="6">
+                    <TextBlock x:Name="TxtRules" TextWrapping="Wrap" FontSize="11" FontFamily="Consolas" LineHeight="16"/>
                 </Border>
 
-                <TextBlock Text="👥 Employee Types" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,10"
-                    Text="• Weekly — paid based on actual days/hours worked&#x0a;• Monthly — fixed salary, only presence is tracked&#x0a;• Excluded — owners/managers, hidden from calculations"/>
+                <!-- OT-Exempt Config -->
+                <Border Background="#FFF8E1" Padding="16" CornerRadius="6" Margin="0,12,0,0" BorderBrush="#FFD54F" BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="⚙️ OT-Exempt Configuration" FontSize="15" FontWeight="Bold" Margin="0,0,0,4"/>
+                        <TextBlock Text="Block OT calculations for entire categories or specific employees. Attendance still shows OT/deduction hours, but salary = Days × DailyRate only."
+                                   TextWrapping="Wrap" FontSize="11" Foreground="Gray" Margin="0,0,0,12"/>
 
-                <TextBlock Text="📋 Examples" FontSize="14" FontWeight="Bold" Margin="0,5,0,5"/>
-                <TextBlock TextWrapping="Wrap" FontSize="13" Margin="10,0,0,15"
-                    Text="• Worker at Rs.1500/day works 6 days, 2h OT total:&#x0a;   = (6 × 1500) + (2 × 187.5) = Rs.9,375&#x0a;&#x0a;• Worker at Rs.1500/day works 6 days, 1h deduction:&#x0a;   = (6 × 1500) + (−1 × 187.5) = Rs.8,812"/>
+                        <!-- Current exempt list -->
+                        <TextBlock Text="Currently OT-Exempt:" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ListBox x:Name="LstExempt" Height="100" Margin="0,0,0,10" FontSize="13">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Button Content="➖ Remove Selected" Click="BtnRemoveExempt_Click" Padding="10,4" FontSize="12" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+
+                        <Separator Margin="0,4,0,12"/>
+
+                        <!-- Add new exempt -->
+                        <TextBlock Text="Add OT-Exempt:" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,6"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Type:" VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="CmbExemptType" Width="140" FontSize="13" SelectionChanged="CmbExemptType_Changed">
+                                <ComboBoxItem Content="Category" IsSelected="True"/>
+                                <ComboBoxItem Content="Employee"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Search box + dropdown list -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <TextBlock Text="Search:" VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0"/>
+                            <TextBox x:Name="TxtSearch" Width="280" FontSize="13" TextChanged="TxtSearch_TextChanged" Padding="4,3"/>
+                            <Button Content="➕ Add" Click="BtnAddExempt_Click" Padding="12,4" FontSize="13" Margin="8,0,0,0"/>
+                        </StackPanel>
+
+                        <!-- Live search results -->
+                        <ListBox x:Name="LstSearchResults" Height="90" Margin="0,4,0,0" FontSize="13"
+                                 SelectionChanged="LstSearchResults_SelectionChanged"/>
+
+                        <TextBlock x:Name="TxtExemptStatus" Text="" FontSize="11" Foreground="Green" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <Button Grid.Row="2" Content="Close" Click="BtnClose_Click" Padding="14,8" FontSize="14" HorizontalAlignment="Right" Margin="0,15,0,0"/>
+        <Button Grid.Row="2" Content="Close" Click="BtnClose_Click" Padding="14,8" FontSize="14" HorizontalAlignment="Right" Margin="0,12,0,0"/>
     </Grid>
 </Window>

@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 using LuksAttendance;
 
@@ -90,32 +91,45 @@ public class SalaryCalcTests
         Assert.Equal("08:00", row.OT);
     }
 
-    // ═══ Grace Period — Strict Exclusive (Bug #1: intentional) ═══
+    // ═══ Grace Period — Now ONLY from isGrace flag, not hardcoded names ═══
 
     [Fact]
-    public void Grace_Haseeb_WithinWindow_NoOT()
+    public void Grace_FlagEnabled_WithinWindow_NoOT()
     {
-        // 8h45 effective (diff=+45min, inside grace window)
-        var row = Build("Haseeb", "08:00", "17:45");
+        // 8h45 effective (diff=+45min, inside grace window), isGrace=true
+        var row = SalaryCalc.BuildAttendanceRow(
+            new PunchRecord { Name = "AnyWorker", DayLabel = "01-Jan (Mo)", InTime = "08:00", OutTime = "17:45" },
+            isGrace: true);
         Assert.Equal("", row.OT);
         Assert.Equal("", row.Deduction);
     }
 
     [Fact]
-    public void Grace_Haseeb_ExactBoundary_OTApplies()
+    public void Grace_FlagEnabled_ExactBoundary_OTApplies()
     {
         // Grace is STRICT exclusive: at exactly +1h (9h effective), OT applies
-        // IN=08:00, OUT=18:00: pres=10h, lunch→9h, round→9h, diff=+60 → NOT in grace
-        var row = Build("Haseeb", "08:00", "18:00");
+        var row = SalaryCalc.BuildAttendanceRow(
+            new PunchRecord { Name = "AnyWorker", DayLabel = "01-Jan (Mo)", InTime = "08:00", OutTime = "18:00" },
+            isGrace: true);
         Assert.Equal("01:00", row.OT);
     }
 
     [Fact]
-    public void NonGrace_SamePunches_GetsOT()
+    public void Grace_FlagDisabled_SamePunches_GetsOT()
     {
-        // Same as Haseeb 8h45 but non-grace → 45min OT
-        var row = Build("Irfan Maana", "08:00", "17:45");
+        // Same punch times but isGrace=false → 45min OT
+        var row = SalaryCalc.BuildAttendanceRow(
+            new PunchRecord { Name = "AnyWorker", DayLabel = "01-Jan (Mo)", InTime = "08:00", OutTime = "17:45" },
+            isGrace: false);
         Assert.Equal("00:45", row.OT);
+    }
+
+    [Fact]
+    public void Grace_HardcodedName_NoLongerAutoGrace()
+    {
+        // "Haseeb" was previously hardcoded — now without isGrace=true, gets OT
+        var row = Build("Haseeb", "08:00", "17:45");
+        Assert.Equal("00:45", row.OT); // NOT suppressed
     }
 
     // ═══ Bug #14: +1 display hidden ═══
@@ -161,7 +175,204 @@ public class SalaryCalcTests
         Assert.Equal(0.0, sal.OtHours);
     }
 
+    // ═══ Edge Cases ═══
+
+    [Fact]
+    public void EmptyPunchRecord_ReturnsEmptyRow()
+    {
+        var row = SalaryCalc.BuildAttendanceRow(new PunchRecord { Name = "Test", DayLabel = "01-Jan (Mo)", InTime = "", OutTime = "" });
+        Assert.Equal("", row.Worked);
+        Assert.Equal("", row.OT);
+        Assert.Equal("", row.Deduction);
+    }
+
+    [Fact]
+    public void ZeroDaysWorked_ZeroSalary()
+    {
+        var rows = new List<AttendanceRow>
+        {
+            new() { Name = "test", Day = "d1", Worked = "" }, // no worked time
+        };
+        var sal = SalaryCalc.Calculate("test", rows, 1500, 0, 0, "Worker");
+        Assert.Equal(0, sal.Days);
+        Assert.Equal(0m, sal.NetSalary);
+    }
+
+    // ═══ TimeHelper Validation ═══
+
+    [Fact]
+    public void TimeHelper_ValidTimes()
+    {
+        Assert.True(TimeHelper.IsValidTime("08:00"));
+        Assert.True(TimeHelper.IsValidTime("23:59"));
+        Assert.True(TimeHelper.IsValidTime("00:00"));
+    }
+
+    [Fact]
+    public void TimeHelper_InvalidTimes()
+    {
+        Assert.False(TimeHelper.IsValidTime(""));
+        Assert.False(TimeHelper.IsValidTime("25:00"));
+        Assert.False(TimeHelper.IsValidTime("12:60"));
+        Assert.False(TimeHelper.IsValidTime("8:00")); // too short
+        Assert.False(TimeHelper.IsValidTime("abc"));
+        Assert.False(TimeHelper.IsValidTime(null!));
+    }
+
+    // ═══ PunchParser Tests ═══
+
+    [Fact]
+    public void PunchParser_TwoPunches_CreatesRecord()
+    {
+        var data = MakeAttendanceData(new Dictionary<string, string>
+        {
+            { "02-Jan (Tu)", "08:00 17:00" }
+        }, "01-Jan (Mo)", "02-Jan (Tu)");
+
+        var (records, issues) = PunchParser.Parse(data);
+        Assert.Single(records);
+        Assert.Equal("08:00", records[0].InTime);
+        Assert.Equal("17:00", records[0].OutTime);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public void PunchParser_SinglePunch_CreatesIssue()
+    {
+        var data = MakeAttendanceData(new Dictionary<string, string>
+        {
+            { "02-Jan (Tu)", "08:00" }
+        }, "01-Jan (Mo)", "02-Jan (Tu)");
+
+        var (records, issues) = PunchParser.Parse(data);
+        Assert.Empty(records);
+        Assert.Single(issues);
+        Assert.Equal("Last Day OUT", issues[0].Type);
+    }
+
+    [Fact]
+    public void PunchParser_MultiplePunches_UsesFirstAndLast()
+    {
+        var data = MakeAttendanceData(new Dictionary<string, string>
+        {
+            { "02-Jan (Tu)", "08:00 12:30 13:30 17:45" }
+        }, "01-Jan (Mo)", "02-Jan (Tu)");
+
+        var (records, issues) = PunchParser.Parse(data);
+        Assert.Single(records);
+        Assert.Equal("08:00", records[0].InTime);
+        Assert.Equal("17:45", records[0].OutTime);
+    }
+
+    [Fact]
+    public void PunchParser_MidnightExit_PairWithPreviousDay()
+    {
+        var data = new AttendanceData
+        {
+            Duration = "2026/01/01 ~ 01/02",
+            Days = new List<DayInfo>
+            {
+                new() { Col = 3, DayNum = 1, DayName = "We", DateLabel = "01-Jan (We)" },
+                new() { Col = 4, DayNum = 2, DayName = "Th", DateLabel = "02-Jan (Th)" }
+            },
+            Employees = new List<EmployeeData>
+            {
+                new()
+                {
+                    No = "1", Name = "Worker1",
+                    Punches = new Dictionary<string, string>
+                    {
+                        { "01-Jan (We)", "20:00" },
+                        { "02-Jan (Th)", "01:30 08:00 17:00" }
+                    }
+                }
+            }
+        };
+
+        var (records, issues) = PunchParser.Parse(data);
+        // Day 1: single punch + midnight exit from day 2 = cross-midnight record
+        var day1Rec = records.FirstOrDefault(r => r.DayLabel == "01-Jan (We)");
+        Assert.NotNull(day1Rec);
+        Assert.Equal("20:00", day1Rec.InTime);
+        Assert.EndsWith("+1", day1Rec.OutTime);
+    }
+
+    [Fact]
+    public void PunchParser_NoPunches_SkipsDay()
+    {
+        var data = MakeAttendanceData(new Dictionary<string, string>(), "01-Jan (Mo)", "02-Jan (Tu)");
+        var (records, issues) = PunchParser.Parse(data);
+        Assert.Empty(records);
+        Assert.Empty(issues);
+    }
+
+    // ═══ OT-Exempt Tests ═══
+
+    [Fact]
+    public void OtExempt_NetHoursZero_SalaryUnaffected()
+    {
+        // Worker with 2h OT but category is OT-exempt → NetHours=0, pay = days × rate only
+        var rows = new List<AttendanceRow>
+        {
+            new() { Name = "test", Day = "d1", Worked = "10:00", OT = "02:00" },
+            new() { Name = "test", Day = "d2", Worked = "08:00" },
+        };
+        var sal = SalaryCalc.Calculate("test carpenter", rows, 1500, 0, 0, "Carpenter", isOtExempt: true);
+        Assert.Equal(2, sal.Days);
+        Assert.Equal(2.0, sal.OtHours);      // OT hours still tracked
+        Assert.Equal(0.0, sal.NetHours);      // But NetHours = 0 (exempt)
+        Assert.Equal(3000m, sal.NetSalary);   // 2 × 1500 = 3000 (no OT pay)
+    }
+
+    [Fact]
+    public void OtExempt_DeductionIgnored()
+    {
+        // Worker with 2h deduction but OT-exempt → no deduction from pay
+        var rows = new List<AttendanceRow>
+        {
+            new() { Name = "test", Day = "d1", Worked = "06:00", Deduction = "02:00" },
+        };
+        var sal = SalaryCalc.Calculate("test carpenter", rows, 1500, 0, 0, "Carpenter", isOtExempt: true);
+        Assert.Equal(1, sal.Days);
+        Assert.Equal(2.0, sal.DedHours);      // Deduction hours still tracked
+        Assert.Equal(0.0, sal.NetHours);      // But NetHours = 0
+        Assert.Equal(1500m, sal.NetSalary);   // 1 × 1500 (no deduction from pay)
+    }
+
+    [Fact]
+    public void NonExempt_OtStillApplied()
+    {
+        // Normal worker (not exempt) → OT affects pay
+        var rows = new List<AttendanceRow>
+        {
+            new() { Name = "test", Day = "d1", Worked = "10:00", OT = "02:00" },
+        };
+        var sal = SalaryCalc.Calculate("test worker", rows, 1600, 0, 0, "Worker", isOtExempt: false);
+        Assert.Equal(1, sal.Days);
+        Assert.Equal(2.0, sal.NetHours);      // NetHours = OT - Ded = 2
+        // 1×1600 + 2×200 = 2000
+        Assert.Equal(2000m, sal.NetSalary);
+    }
+
     // ═══ Helper ═══
+
     private static AttendanceRow Build(string name, string inTime, string outTime)
         => SalaryCalc.BuildAttendanceRow(new PunchRecord { Name = name, DayLabel = "01-Jan (Mo)", InTime = inTime, OutTime = outTime });
+
+    private static AttendanceData MakeAttendanceData(Dictionary<string, string> punches, params string[] dayLabels)
+    {
+        var days = new List<DayInfo>();
+        for (int i = 0; i < dayLabels.Length; i++)
+            days.Add(new DayInfo { Col = i + 3, DayNum = i + 1, DayName = dayLabels[i].Split('(')[1].TrimEnd(')'), DateLabel = dayLabels[i] });
+
+        return new AttendanceData
+        {
+            Duration = "2026/01/01 ~ 01/07",
+            Days = days,
+            Employees = new List<EmployeeData>
+            {
+                new() { No = "1", Name = "TestWorker", Punches = punches }
+            }
+        };
+    }
 }

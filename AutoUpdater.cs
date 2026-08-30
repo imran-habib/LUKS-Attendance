@@ -10,7 +10,7 @@ namespace LuksAttendance;
 
 public static class AutoUpdater
 {
-    private const string CurrentVersion = "3.2.0";
+    private const string CurrentVersion = "4.1.0";
     private const string RepoOwner = "imran-habib";
     private const string RepoName = "LUKS-Attendance";
 
@@ -20,6 +20,7 @@ public static class AutoUpdater
         {
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Add("User-Agent", "LUKS-Attendance-Updater");
+            http.Timeout = TimeSpan.FromSeconds(10);
 
             // Check latest GitHub Release
             var url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
@@ -77,9 +78,9 @@ public static class AutoUpdater
                 System.IO.File.WriteAllText(skipFile, latestVersion);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Silently fail — don't bother user if update check fails
+            AppLogger.Log("AutoUpdater", ex);
         }
     }
 }

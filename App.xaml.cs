@@ -10,6 +10,7 @@ public partial class App : Application
         base.OnStartup(e);
         DispatcherUnhandledException += (s, args) =>
         {
+            AppLogger.Log("UnhandledException", args.Exception);
             MessageBox.Show(
                 $"An unexpected error occurred:\n\n{args.Exception.Message}\n\n" +
                 "The application will continue running.\nPlease report this error.",
@@ -31,6 +32,8 @@ public partial class App : Application
 
         // Try to load existing DB settings silently
         DatabaseService.LoadSettings();
+
+        AppLogger.Log("Application started.");
 
         // Show main window, shutdown when it closes
         ShutdownMode = ShutdownMode.OnMainWindowClose;

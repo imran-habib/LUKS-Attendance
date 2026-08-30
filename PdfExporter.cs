@@ -129,23 +129,66 @@ public static class PdfExporter
                 return tempPath;
             }
         }
-        catch { }
+        catch (System.Exception ex)
+        {
+            AppLogger.Log("PdfExporter.GetLogoPath", ex);
+        }
         return null;
     }
 
     public static void Print(ObservableCollection<SalaryRow> salary)
     {
-        var dlg = new PrintDialog();
-        if (dlg.ShowDialog() != true) return;
-
         var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "LUKS_Print.pdf");
-        Export(tempPath, new ObservableCollection<AttendanceRow>(), salary, "");
 
-        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        try
         {
-            FileName = tempPath,
-            UseShellExecute = true,
-            Verb = "print"
-        });
+            Export(tempPath, new ObservableCollection<AttendanceRow>(), salary, "");
+        }
+        catch (System.Exception ex)
+        {
+            AppLogger.Log("PdfExporter.Print.Export", ex);
+            System.Windows.MessageBox.Show($"Failed to generate PDF:\n{ex.Message}", "Print Error",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+            return;
+        }
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = tempPath,
+                UseShellExecute = true,
+                Verb = "print"
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // No default PDF viewer — try just opening the file
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = tempPath,
+                    UseShellExecute = true
+                });
+                System.Windows.MessageBox.Show(
+                    $"No default PDF printer found.\nThe PDF was opened instead — please print from your PDF viewer.\n\nFile: {tempPath}",
+                    "Print", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            }
+            catch (System.Exception ex2)
+            {
+                AppLogger.Log("PdfExporter.Print.OpenFallback", ex2);
+                System.Windows.MessageBox.Show(
+                    $"Cannot print or open PDF.\nNo PDF viewer installed.\n\nFile saved at: {tempPath}",
+                    "Print Error", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+            }
+        }
+        catch (System.Exception ex)
+        {
+            AppLogger.Log("PdfExporter.Print", ex);
+            System.Windows.MessageBox.Show($"Print failed:\n{ex.Message}", "Print Error",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+        }
     }
 }

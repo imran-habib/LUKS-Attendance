@@ -63,6 +63,12 @@ public partial class PayrollWizardWindow : Window
                 MessageBox.Show("Please select start and end dates.", "Missing Dates");
                 return;
             }
+            // Validate date range
+            if (DpWizStart.SelectedDate > DpWizEnd.SelectedDate)
+            {
+                MessageBox.Show("Start date must be before end date.", "Invalid Date Range");
+                return;
+            }
         }
         if (_step == 1 && _attRows.Count == 0)
         {
@@ -108,6 +114,7 @@ public partial class PayrollWizardWindow : Window
         }
         catch (Exception ex)
         {
+            AppLogger.Log("WizLoadFile", ex);
             MessageBox.Show($"Error: {ex.Message}", "Import Failed");
         }
     }
@@ -127,9 +134,15 @@ public partial class PayrollWizardWindow : Window
         _issues.Clear();
 
         var empTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var empGrace = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
         foreach (var emp in _employeeDb)
+        {
             if (!string.IsNullOrWhiteSpace(emp.Name))
+            {
                 empTypes[emp.Name.ToLower()] = emp.Type;
+                empGrace[emp.Name.ToLower()] = emp.IsGrace;
+            }
+        }
 
         var isMonthly = RbMonthly.IsChecked == true;
 
@@ -157,7 +170,8 @@ public partial class PayrollWizardWindow : Window
             }
             if (!isMonthly && empTypes.TryGetValue(rec.Name.ToLower(), out var wt) && wt != "weekly") continue;
             if (isMonthly) continue;
-            _attRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            bool grace = empGrace.TryGetValue(rec.Name.ToLower(), out var g) && g;
+            _attRows.Add(SalaryCalc.BuildAttendanceRow(rec, grace));
         }
 
         // Monthly: just presence markers
@@ -170,7 +184,7 @@ public partial class PayrollWizardWindow : Window
         int employees = _attRows.Select(r => r.Name).Distinct().Count();
         int days = _attRows.Select(r => r.Day).Distinct().Count();
         TxtWizSummary.Text = $"✅ Loaded successfully!\n\n• Employees: {employees}\n• Days: {days}\n• Missing punches: {_issues.Count}\n• Attendance records: {_attRows.Count}";
-        TxtWizSummary.Foreground = System.Windows.Media.Brushes.Black;
+        TxtWizSummary.Foreground = Brushes.Black;
     }
 
     // Step 3: Issues
@@ -181,69 +195,46 @@ public partial class PayrollWizardWindow : Window
         {
             if (string.IsNullOrEmpty(issue.InTime) || !TimeHelper.IsValidTime(issue.InTime)) continue;
             var parts = issue.InTime.Split(':');
-            int h = int.Parse(parts[0]) + 9;
+            int h = int.Parse(parts[0]) + SalaryCalc.DefaultShiftHours; // Configurable, not hardcoded 9
             int m = int.Parse(parts[1]);
             if (h >= 24) h -= 24;
             issue.OutTime = $"{h:D2}:{m:D2}";
             filled++;
         }
-        TxtWizIssueCount.Text = $"Auto-filled {filled} OUT times. Edit if needed, then Resolve All.";
+        TxtWizIssueCount.Text = $"Auto-filled {filled} OUT times (IN + {SalaryCalc.DefaultShiftHours}h). Edit if needed, then Resolve All.";
     }
 
     private void BtnWizResolveAll_Click(object sender, RoutedEventArgs e)
     {
+        // Build grace lookup
+        var empGrace = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var emp in _employeeDb)
+            if (!string.IsNullOrWhiteSpace(emp.Name))
+                empGrace[emp.Name.ToLower()] = emp.IsGrace;
+
         var toResolve = _issues.ToList();
         int resolved = 0;
         foreach (var issue in toResolve)
         {
             string outTime = issue.OutTime?.Trim() ?? "";
             if (!TimeHelper.IsValidTime(outTime)) continue;
+            bool grace = empGrace.TryGetValue(issue.Name.ToLower(), out var g) && g;
             var rec = new PunchRecord { Name = issue.Name, DayLabel = issue.DayLabel, InTime = issue.InTime, OutTime = outTime, Status = "resolved" };
-            _attRows.Add(SalaryCalc.BuildAttendanceRow(rec));
+            _attRows.Add(SalaryCalc.BuildAttendanceRow(rec, grace));
             _issues.Remove(issue);
             resolved++;
         }
         TxtWizIssueCount.Text = $"Resolved {resolved}. {_issues.Count} remaining.";
     }
 
-    // Step 4: Salary
+    // Step 4: Salary — delegates to shared SalaryService
     private void ComputeSalary()
     {
         _salaryRows.Clear();
-        var dbDict = new Dictionary<string, EmployeeEntry>(StringComparer.OrdinalIgnoreCase);
-        foreach (var emp in _employeeDb)
-        {
-            var key = emp.Name.ToLower();
-            if (!string.IsNullOrWhiteSpace(key) && !dbDict.ContainsKey(key))
-                dbDict[key] = emp;
-        }
-
         var mode = RbMonthly.IsChecked == true ? "monthly" : "weekly";
-        var grouped = _attRows.Where(r => !string.IsNullOrWhiteSpace(r.Name)).GroupBy(r => r.Name.ToLower());
-        foreach (var grp in grouped.OrderBy(g => g.Key))
-        {
-            if (!dbDict.TryGetValue(grp.Key, out var entry)) continue;
-            if (entry.Type == "excluded") continue;
-            if (entry.Type != mode) continue;
-            var sal = SalaryCalc.Calculate(grp.Key, grp.ToList(), entry.DailyRate, 0, 0, entry.Category, entry.Type == "monthly");
-            _salaryRows.Add(sal);
-        }
-
-        // Traffic lights
-        try
-        {
-            var averages = DatabaseService.GetEmployeeAverages(4);
-            foreach (var row in _salaryRows)
-            {
-                if (averages.TryGetValue(row.Name, out double avg) && avg > 0)
-                {
-                    double diff = Math.Abs((double)row.NetSalary - avg) / avg;
-                    row.StatusIndicator = diff <= 0.15 ? "🟢" : diff <= 0.30 ? "🟡" : "🔴";
-                }
-                else row.StatusIndicator = "⚪";
-            }
-        }
-        catch { }
+        var results = SalaryService.ComputeSalary(_attRows, _employeeDb, mode);
+        foreach (var row in results)
+            _salaryRows.Add(row);
 
         decimal total = _salaryRows.Sum(r => r.NetSalary);
         double otTotal = _salaryRows.Sum(r => r.OtHours);

@@ -74,34 +74,36 @@ public class SalaryRow : INotifyPropertyChanged
 
 public static class SalaryCalc
 {
-    private const int StandardWorkHours = 8;
-    private const int LunchBreakMinutes = 60;
-    private const int LunchCutoffHour = 13;
-    private const int RoundingMinutes = 15;
+    // ═══ Public constants (used by SalaryRulesWindow for display) ═══
+    public const int StandardWorkHours = 8;
+    public const int LunchBreakMinutes = 60;
+    public const int LunchCutoffHour = 13;
+    public const int RoundingMinutes = 15;
+    public const int GraceWindowHours = 1; // ±1h exclusive
 
-    // Grace window is (-1h, +1h) EXCLUSIVE by business decision (confirmed with owner).
-    // At exactly 7h or 9h effective, OT/deduction DOES apply. This is intentional.
-    // Legacy name-based list kept for backward compat; prefer EmployeeEntry.IsGrace flag.
-    private static readonly HashSet<string> GraceEmployees = new(StringComparer.OrdinalIgnoreCase)
-        { "Haseeb", "Zubair Khan" };
+    // Standard auto-fill shift duration (configurable)
+    public static int DefaultShiftHours { get; set; } = 9;
 
+    /// <summary>
+    /// Grace window is (-1h, +1h) EXCLUSIVE by business decision (confirmed with owner).
+    /// At exactly 7h or 9h effective, OT/deduction DOES apply. This is intentional.
+    /// Grace is now determined ONLY by EmployeeEntry.IsGrace flag — no hardcoded names.
+    /// </summary>
     public static AttendanceRow BuildAttendanceRow(PunchRecord rec, bool isGrace = false)
     {
         if (string.IsNullOrEmpty(rec.InTime) || string.IsNullOrEmpty(rec.OutTime))
             return new AttendanceRow { Name = rec.Name, Day = rec.DayLabel, Status = rec.Status };
 
         var presence = CalcPresence(rec.InTime, rec.OutTime);
-        // Bug #4 fix: deduct lunch first, then round
         var effective = CalcEffective(presence, rec.OutTime);
         effective = RoundToNearest(effective, RoundingMinutes);
         var diff = effective - TimeSpan.FromHours(StandardWorkHours);
 
-        // Bug #11 fix: grace from EmployeeEntry.IsGrace (fallback to hardcoded for compat)
-        bool hasGrace = isGrace || GraceEmployees.Contains(rec.Name);
-        if (hasGrace && diff > TimeSpan.FromHours(-1) && diff < TimeSpan.FromHours(1))
+        // Grace from EmployeeEntry.IsGrace only — no hardcoded name list
+        if (isGrace && diff > TimeSpan.FromHours(-GraceWindowHours) && diff < TimeSpan.FromHours(GraceWindowHours))
             diff = TimeSpan.Zero;
 
-        // Bug #14 fix: hide +1 internal format from user-facing UI
+        // Hide +1 internal format from user-facing UI
         var displayOut = rec.OutTime.EndsWith("+1") ? rec.OutTime[..5] + " (next day)" : rec.OutTime;
 
         return new AttendanceRow
@@ -116,7 +118,7 @@ public static class SalaryCalc
     }
 
     public static SalaryRow Calculate(string nameKey, List<AttendanceRow> rows, int dailyRate,
-        decimal advance, decimal arrears, string category = "", bool isMonthly = false)
+        decimal advance, decimal arrears, string category = "", bool isMonthly = false, bool isOtExempt = false)
     {
         int daysWorked = rows.Count(r => !string.IsNullOrEmpty(r.Worked));
 
@@ -150,7 +152,8 @@ public static class SalaryCalc
 
         double otH = Math.Round(totalOt.TotalHours, 2);
         double dedH = Math.Round(totalDed.TotalHours, 2);
-        double netH = Math.Round(otH - dedH, 2);
+        // OT-exempt: still track hours for display but NetHours = 0 so pay is unaffected
+        double netH = isOtExempt ? 0 : Math.Round(otH - dedH, 2);
         double hourlyRate = dailyRate / 8.0;
 
         var row2 = new SalaryRow
@@ -187,7 +190,7 @@ public static class SalaryCalc
     {
         var outClean = outTime.EndsWith("+1") ? outTime[..5] : outTime;
         int outHour = int.Parse(outClean[..2]);
-        // Bug #3 fix: cross-midnight lunch only if shift >= 5h
+        // Cross-midnight lunch only if shift >= 5h
         if (outTime.EndsWith("+1"))
             return presence >= NightLunchThreshold ? presence - TimeSpan.FromMinutes(LunchBreakMinutes) : presence;
         if (outHour >= LunchCutoffHour)
@@ -222,7 +225,7 @@ public static class TimeHelper
 {
     public static bool IsValidTime(string s)
     {
-        if (s.Length != 5 || s[2] != ':') return false;
+        if (string.IsNullOrEmpty(s) || s.Length != 5 || s[2] != ':') return false;
         return int.TryParse(s[..2], out int h) && int.TryParse(s[3..], out int m)
                && h >= 0 && h <= 23 && m >= 0 && m <= 59;
     }

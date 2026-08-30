@@ -8,7 +8,7 @@
     <RootNamespace>LuksAttendance</RootNamespace>
     <AssemblyName>LUKS-Attendance</AssemblyName>
     <ApplicationIcon>assets\logo.ico</ApplicationIcon>
-    <Version>3.2.0</Version>
+    <Version>4.1.0</Version>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>

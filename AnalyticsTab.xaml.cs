@@ -16,7 +16,11 @@ public partial class AnalyticsTab : UserControl
     public AnalyticsTab()
     {
         InitializeComponent();
-        Loaded += (_, _) => { try { LoadCharts(); } catch { } };
+        Loaded += (_, _) =>
+        {
+            try { LoadCharts(); }
+            catch (Exception ex) { AppLogger.Log("AnalyticsTab.Loaded", ex); }
+        };
     }
 
     private void BtnRefresh_Click(object sender, RoutedEventArgs e) => LoadCharts();

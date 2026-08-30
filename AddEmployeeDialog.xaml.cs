@@ -24,13 +24,19 @@ public partial class AddEmployeeDialog : Window
             return;
         }
 
-        if (!int.TryParse(TxtRate.Text.Trim(), out int rate))
+        if (!int.TryParse(TxtRate.Text.Trim(), out int rate) || rate <= 0)
         {
-            MessageBox.Show("Please enter a valid daily rate.", "Invalid Rate");
+            MessageBox.Show("Please enter a valid daily rate (must be a positive number).", "Invalid Rate");
             return;
         }
 
         var category = CmbCategory.Text.Trim();
+        if (string.IsNullOrEmpty(category))
+        {
+            MessageBox.Show("Please select or enter a category.", "Missing Category");
+            return;
+        }
+
         var type = (CmbType.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "weekly";
 
         NewEmployee = new EmployeeEntry
