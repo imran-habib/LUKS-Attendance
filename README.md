@@ -4,7 +4,7 @@ Windows desktop application for attendance processing and salary calculation. Bu
 
 ## ⬇️ Download
 
-**[Download LUKS-Attendance_v3.2.0.exe](https://github.com/imran-habib/LUKS-Attendance/releases/latest)**
+**[Download LUKS-Attendance_v4.1.0.exe](https://github.com/imran-habib/LUKS-Attendance/releases/latest)**
 
 No installation needed — just download and run the .exe.
 
@@ -28,12 +28,15 @@ No installation needed — just download and run the .exe.
 - Auto-resolve midnight exits (punches before 3:30am = previous day's exit)
 - Weekly workers: full OT/deduction (8h standard, 15-min rounding, 1h lunch if OUT ≥ 13:00)
 - Monthly workers: just count presence days (any punch = 1 day)
+- **OT-Exempt configuration** — block OT per category or per employee (Rules → OT Config)
 - Grace period for configurable employees (checkbox in Employee DB)
 - Traffic light indicators (🟢🟡🔴) comparing salary to 4-week average
 - Analytics tab with trend charts, category breakdown, OT tracking, forecasting
 - Direct device connection (ZK protocol over TCP)
 - PDF/Excel export with DailyRate and HourlyRate columns
-- SQLite history for previous payrolls
+- SQLite history for previous payrolls + employee DB persistence
+- Hashed login credentials (PBKDF2/SHA256)
+- File-based error logging
 - Auto-updater checks GitHub for new builds
 
 ## Salary Formula
@@ -44,7 +47,7 @@ Net Salary = Days × DailyRate + (NetHours + ExtraHrs) × HourlyRate - Advance +
 
 Where:
 - HourlyRate = DailyRate ÷ 8
-- NetHours = OT hours − Deduction hours
+- NetHours = OT hours − Deduction hours (0 for OT-exempt categories/employees)
 - Worked hours = Presence − 1h lunch (if OUT ≥ 13:00)
 - 15-minute rounding applied after lunch deduction
 
